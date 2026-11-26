@@ -1,0 +1,17 @@
+{
+  "name": "Nova Meet",
+  "short_name": "Nova",
+  "description": "Lightweight WebRTC video meetings powered by Rust + str0m SFU",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f17",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/brand-assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

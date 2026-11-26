@@ -1,0 +1,44 @@
+{
+  "target": "nova",
+  "version": "0.1.0",
+  "recorded_against": "target/release/nova",
+  "cases": [
+    {
+      "name": "health",
+      "method": "GET",
+      "path": "/health",
+      "expected_status": 200,
+      "expected_json": { "status": "ok" }
+    },
+    {
+      "name": "ready",
+      "method": "GET",
+      "path": "/ready",
+      "expected_status": 200,
+      "expected_json": { "status": "ready", "database": "sqlite" }
+    },
+    {
+      "name": "api_status",
+      "method": "GET",
+      "path": "/api/status",
+      "expected_status": 200,
+      "expected_keys": ["status", "service", "version", "timestamp"]
+    },
+    {
+      "name": "jitsi_config_js",
+      "method": "GET",
+      "path": "/config.js",
+      "expected_status": 200,
+      "expected_content_type": "application/javascript",
+      "contains": ["var config", "\"sfu\":\"str0m\""]
+    },
+    {
+      "name": "jitsi_external_api_js",
+      "method": "GET",
+      "path": "/external_api.js",
+      "expected_status": 200,
+      "expected_content_type": "application/javascript",
+      "contains": ["JitsiMeetExternalAPI", "NovaMeetExternalAPI", "executeCommand"]
+    }
+  ]
+}

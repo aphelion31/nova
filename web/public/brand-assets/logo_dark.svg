@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 48" fill="none">
+  <defs>
+    <linearGradient id="nova-dark" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="55%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="4" width="40" height="40" rx="11" fill="url(#nova-dark)"/>
+  <circle cx="22" cy="24" r="13" stroke="rgba(255,255,255,0.3)" stroke-width="1.2"/>
+  <path d="M22 10L25.2 20.8L36 24L25.2 27.2L22 38L18.8 27.2L8 24L18.8 20.8L22 10Z" fill="#FFFFFF"/>
+  <circle cx="22" cy="24" r="3" fill="#0B0F17"/>
+  <text x="54" y="31" fill="#F8FAFC" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="24" font-weight="800" letter-spacing="-0.03em">Nova</text>
+</svg>

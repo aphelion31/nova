@@ -1,0 +1,32 @@
+[package]
+name = "nova-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared signaling protocol, deterministic room reducer, E2EE helper, and UniFFI bindings for Nova"
+
+[lib]
+name = "nova_core"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+default = []
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+aes-gcm = "0.10"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+hkdf = "0.12"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "2"
+uniffi = "0.33"
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
