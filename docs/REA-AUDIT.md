@@ -1,4 +1,4 @@
-# REA Shipped-Artifact Inspection & Release Audit (`nova` NVA-002)
+# REA Shipped-Artifact Inspection & Release Audit (`nova` v1.1.0)
 
 Recorded using REA MCP tools against the compiled `nova` release binary (`target/release/nova`) and built React Router 8 PWA bundle (`web/build/client`).
 
