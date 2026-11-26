@@ -1,0 +1,14 @@
+target/
+storage/
+nova.db*
+*.db-shm
+*.db-wal
+.env
+web/node_modules/
+web/build/
+web/.react-router/
+mobile/ios/.build/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/local.properties
+.DS_Store
