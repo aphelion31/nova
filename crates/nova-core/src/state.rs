@@ -1,5 +1,6 @@
 use crate::protocol::{
-    BreakoutRoom, ChatMessage, LobbyEntry, Participant, Poll, RoomSecurityState, ServerMessage, WhiteboardStroke,
+    BreakoutRoom, ChatMessage, FollowMeState, LobbyEntry, Participant, Poll, RoomSecurityState, ServerMessage,
+    SharedFileMeta, SharedVideoState, SubtitleEntry, WhiteboardStroke,
 };
 use std::collections::HashMap;
 
@@ -20,6 +21,11 @@ pub struct RoomSnapshot {
     pub breakouts: Vec<BreakoutRoom>,
     pub strokes: Vec<WhiteboardStroke>,
     pub security: RoomSecurityState,
+    pub shared_video: Option<SharedVideoState>,
+    pub follow_me: Option<FollowMeState>,
+    pub files: Vec<SharedFileMeta>,
+    pub subtitles: Vec<SubtitleEntry>,
+    pub conference_ended_by: Option<String>,
     pub sdp_answer: Option<String>,
     pub pending_renegotiate_sdp: Option<String>,
     pub track_owners: HashMap<String, String>,
@@ -49,7 +55,14 @@ impl RoomSnapshot {
                 e2ee_enabled: false,
                 has_password: false,
                 subject: room_name,
+                start_audio_muted: false,
+                start_video_muted: false,
             },
+            shared_video: None,
+            follow_me: None,
+            files: Vec::new(),
+            subtitles: Vec::new(),
+            conference_ended_by: None,
             sdp_answer: None,
             pending_renegotiate_sdp: None,
             track_owners: HashMap::new(),
@@ -71,6 +84,9 @@ impl RoomSnapshot {
                 strokes,
                 lobby,
                 security,
+                shared_video,
+                follow_me,
+                files,
                 ..
             } => {
                 self.self_id = Some(self_id.clone());
@@ -80,6 +96,7 @@ impl RoomSnapshot {
                 self.lobby_message = None;
                 self.rejected_reason = None;
                 self.last_error = None;
+                self.conference_ended_by = None;
                 self.participants = participants.clone();
                 self.messages = messages.clone();
                 self.polls = polls.clone();
@@ -87,6 +104,9 @@ impl RoomSnapshot {
                 self.strokes = strokes.clone();
                 self.lobby = lobby.clone();
                 self.security = security.clone();
+                self.shared_video = shared_video.clone();
+                self.follow_me = follow_me.clone();
+                self.files = files.clone();
                 self.recompute_active_speaker();
             }
             ServerMessage::LobbyWaiting { room, message } => {
@@ -162,6 +182,27 @@ impl RoomSnapshot {
             ServerMessage::RoomSecurityUpdated { security } => {
                 self.security = security.clone();
             }
+            ServerMessage::Subtitle { entry } => {
+                self.subtitles.push(entry.clone());
+                if self.subtitles.len() > 100 {
+                    let drain = self.subtitles.len() - 100;
+                    self.subtitles.drain(0..drain);
+                }
+            }
+            ServerMessage::SharedVideoUpdated { state } => {
+                self.shared_video = state.clone();
+            }
+            ServerMessage::FollowMeUpdated { state } => {
+                self.follow_me = Some(state.clone());
+            }
+            ServerMessage::FileShared { file } => {
+                if !self.files.iter().any(|f| f.id == file.id) {
+                    self.files.push(file.clone());
+                }
+            }
+            ServerMessage::ConferenceEnded { by_name } => {
+                self.conference_ended_by = Some(by_name.clone());
+            }
             ServerMessage::Error { message, .. } => {
                 self.last_error = Some(message.clone());
             }
@@ -227,7 +268,12 @@ mod tests {
                 e2ee_enabled: false,
                 has_password: false,
                 subject: "Daily".into(),
+                start_audio_muted: false,
+                start_video_muted: false,
             },
+            shared_video: None,
+            follow_me: None,
+            files: vec![],
         });
         assert!(!snap.in_lobby);
         assert!(snap.is_moderator);
@@ -235,6 +281,62 @@ mod tests {
 
         snap.apply_server_event(&ServerMessage::ParticipantLeft { peer_id: "p2".into() });
         assert_eq!(snap.active_speaker_id.as_deref(), Some("p1"));
+    }
+
+    #[test]
+    fn reducer_tracks_subtitles_shared_video_follow_me_files_and_end() {
+        let mut snap = RoomSnapshot::new("demo");
+        snap.apply_server_event(&ServerMessage::Subtitle {
+            entry: SubtitleEntry {
+                id: "s1".into(),
+                peer_id: "p1".into(),
+                display_name: "Alice".into(),
+                text: "Hello world".into(),
+                is_final: true,
+                created_at: 10,
+            },
+        });
+        assert_eq!(snap.subtitles.len(), 1);
+
+        snap.apply_server_event(&ServerMessage::SharedVideoUpdated {
+            state: Some(SharedVideoState {
+                url: "https://example.com/demo.mp4".into(),
+                owner_id: "p1".into(),
+                owner_name: "Alice".into(),
+                playing: true,
+                time_secs: 4.0,
+                updated_at: 11,
+            }),
+        });
+        assert!(snap.shared_video.as_ref().is_some_and(|v| v.playing));
+
+        snap.apply_server_event(&ServerMessage::FollowMeUpdated {
+            state: FollowMeState {
+                enabled: true,
+                leader_id: Some("p1".into()),
+                pinned_peer_id: Some("p2".into()),
+                tile_view: false,
+            },
+        });
+        assert!(snap.follow_me.as_ref().is_some_and(|f| f.enabled));
+
+        let meta = SharedFileMeta {
+            id: "f1".into(),
+            room_name: "demo".into(),
+            sender_name: "Alice".into(),
+            filename: "notes.txt".into(),
+            mime_type: "text/plain".into(),
+            size_bytes: 42,
+            created_at: 12,
+        };
+        snap.apply_server_event(&ServerMessage::FileShared { file: meta.clone() });
+        snap.apply_server_event(&ServerMessage::FileShared { file: meta });
+        assert_eq!(snap.files.len(), 1);
+
+        snap.apply_server_event(&ServerMessage::ConferenceEnded {
+            by_name: "Alice".into(),
+        });
+        assert_eq!(snap.conference_ended_by.as_deref(), Some("Alice"));
     }
 
     #[test]
@@ -254,6 +356,9 @@ mod tests {
                 recipient_id: None,
                 body: "hello".into(),
                 created_at: 1,
+                reply_to_id: None,
+                reply_to_sender: None,
+                reply_to_body: None,
             },
         });
         assert!(snap.sdp_answer.is_none());

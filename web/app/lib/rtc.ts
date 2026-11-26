@@ -3,6 +3,7 @@ import {
   attachSenderE2ee,
   supportsEncodedInsertableStreams,
 } from "~/lib/e2ee";
+import type { SharedFileMeta } from "~/lib/api";
 
 export interface IceServerConfig {
   urls: string[];
@@ -43,6 +44,9 @@ export interface ChatMessage {
   recipient_id?: string | null;
   body: string;
   created_at: number;
+  reply_to_id?: string | null;
+  reply_to_sender?: string | null;
+  reply_to_body?: string | null;
 }
 
 export interface PollOption {
@@ -83,6 +87,44 @@ export interface RoomSecurityState {
   e2ee_enabled: boolean;
   has_password: boolean;
   subject: string;
+  start_audio_muted?: boolean;
+  start_video_muted?: boolean;
+}
+
+export interface SharedVideoState {
+  url: string;
+  owner_id: string;
+  owner_name: string;
+  playing: boolean;
+  time_secs: number;
+  updated_at: number;
+}
+
+export interface SubtitleEntry {
+  id: string;
+  peer_id: string;
+  display_name: string;
+  text: string;
+  is_final: boolean;
+  created_at: number;
+}
+
+export interface FollowMeState {
+  enabled: boolean;
+  leader_id?: string | null;
+  pinned_peer_id?: string | null;
+  tile_view: boolean;
+}
+
+export type VideoQualityMode = "hd" | "sd" | "low" | "audio_only";
+
+export interface ConnectionStats {
+  rttMs: number | null;
+  packetLossPct: number | null;
+  bitrateKbps: number | null;
+  resolution: string | null;
+  iceState: RTCIceConnectionState;
+  quality: "good" | "fair" | "poor";
 }
 
 export interface FloatingReaction {
@@ -97,6 +139,12 @@ export interface NovaRtcCallbacks {
   onReaction: (reaction: FloatingReaction) => void;
   onModerated: (action: string, byName: string) => void;
   onConferenceLeft: () => void;
+  onParticipantJoined?: (participant: Participant) => void;
+  onParticipantLeft?: (participant: Participant | undefined, peerId: string) => void;
+  onLobbyRequest?: (entry: LobbyEntry) => void;
+  onSubtitle?: (entry: SubtitleEntry) => void;
+  onConferenceEnded?: (byName: string) => void;
+  onTalkWhileMuted?: () => void;
 }
 
 export class NovaRtcSession {
@@ -117,7 +165,12 @@ export class NovaRtcSession {
   polls: Poll[] = [];
   breakouts: BreakoutRoom[] = [];
   strokes: WhiteboardStroke[] = [];
+  files: SharedFileMeta[] = [];
+  subtitles: SubtitleEntry[] = [];
+  sharedVideo: SharedVideoState | null = null;
+  followMe: FollowMeState | null = null;
   security: RoomSecurityState;
+  videoQuality: VideoQualityMode = "hd";
 
   localStream: MediaStream | null = null;
   screenStream: MediaStream | null = null;
@@ -139,6 +192,13 @@ export class NovaRtcSession {
   private videoMuted = false;
   private screenSharing = false;
   private closed = false;
+  private talkWhileMutedEnabled = true;
+  private lastMuteToggleAt = 0;
+  private lastTalkWhileMutedAlertAt = 0;
+  private loudMutedStreak = 0;
+  private monitorTrack: MediaStreamTrack | null = null;
+  private lastBytesSent = 0;
+  private lastStatsAt = 0;
 
   constructor(room: string, callbacks: NovaRtcCallbacks) {
     this.room = room;
@@ -149,11 +209,17 @@ export class NovaRtcSession {
       e2ee_enabled: false,
       has_password: false,
       subject: room,
+      start_audio_muted: false,
+      start_video_muted: false,
     };
   }
 
   setE2eeKey(key: CryptoKey | null) {
     this.e2eeKey = key;
+  }
+
+  setTalkWhileMutedEnabled(enabled: boolean) {
+    this.talkWhileMutedEnabled = enabled;
   }
 
   getActiveSpeakerId(): string | null {
@@ -170,6 +236,8 @@ export class NovaRtcSession {
     displayName: string;
     password?: string;
     token?: string;
+    email?: string;
+    avatarUrl?: string;
     audioMuted: boolean;
     videoMuted: boolean;
     localStream: MediaStream | null;
@@ -189,6 +257,8 @@ export class NovaRtcSession {
         display_name: opts.displayName,
         password: opts.password || null,
         token: opts.token || null,
+        email: opts.email || null,
+        avatar_url: opts.avatarUrl || null,
         audio_muted: opts.audioMuted,
         video_muted: opts.videoMuted,
       });
@@ -239,7 +309,16 @@ export class NovaRtcSession {
         this.breakouts = (msg.breakouts as BreakoutRoom[]) || [];
         this.strokes = (msg.strokes as WhiteboardStroke[]) || [];
         this.lobby = (msg.lobby as LobbyEntry[]) || [];
+        this.files = (msg.files as SharedFileMeta[]) || [];
+        this.sharedVideo = (msg.shared_video as SharedVideoState) || null;
+        this.followMe = (msg.follow_me as FollowMeState) || null;
         this.security = msg.security as RoomSecurityState;
+
+        const selfPart = this.participants.find((p) => p.id === this.selfId);
+        if (selfPart) {
+          this.audioMuted = selfPart.audio_muted;
+          this.videoMuted = selfPart.video_muted;
+        }
         this.callbacks.onStateChange();
         this.initPeerConnection().catch((err) => {
           this.lastError = err instanceof Error ? err.message : "Failed to initialize WebRTC";
@@ -256,6 +335,7 @@ export class NovaRtcSession {
         const entry = msg.entry as LobbyEntry;
         if (!this.lobby.some((e) => e.peer_id === entry.peer_id)) {
           this.lobby = [...this.lobby, entry];
+          this.callbacks.onLobbyRequest?.(entry);
           this.callbacks.onStateChange();
         }
         break;
@@ -297,6 +377,7 @@ export class NovaRtcSession {
       case "participant_joined": {
         const p = msg.participant as Participant;
         this.participants = [...this.participants.filter((x) => x.id !== p.id), p];
+        this.callbacks.onParticipantJoined?.(p);
         this.callbacks.onStateChange();
         break;
       }
@@ -316,9 +397,11 @@ export class NovaRtcSession {
       }
       case "participant_left": {
         const peerId = msg.peer_id as string;
+        const departed = this.participants.find((p) => p.id === peerId);
         this.participants = this.participants.filter((p) => p.id !== peerId);
         this.remoteStreams.delete(peerId);
         this.remoteScreenStreams.delete(peerId);
+        this.callbacks.onParticipantLeft?.(departed, peerId);
         this.callbacks.onStateChange();
         break;
       }
@@ -370,6 +453,36 @@ export class NovaRtcSession {
         this.security = msg.security as RoomSecurityState;
         this.callbacks.onStateChange();
         break;
+      case "subtitle": {
+        const entry = msg.entry as SubtitleEntry;
+        this.subtitles = [...this.subtitles.slice(-99), entry];
+        this.callbacks.onSubtitle?.(entry);
+        this.callbacks.onStateChange();
+        break;
+      }
+      case "shared_video_updated":
+        this.sharedVideo = (msg.state as SharedVideoState) || null;
+        this.callbacks.onStateChange();
+        break;
+      case "follow_me_updated":
+        this.followMe = msg.state as FollowMeState;
+        this.callbacks.onStateChange();
+        break;
+      case "file_shared": {
+        const file = msg.file as SharedFileMeta;
+        if (!this.files.some((f) => f.id === file.id)) {
+          this.files = [...this.files, file];
+          this.callbacks.onStateChange();
+        }
+        break;
+      }
+      case "conference_ended": {
+        const byName = (msg.by_name as string) || "Host";
+        this.close();
+        this.callbacks.onConferenceEnded?.(byName);
+        this.callbacks.onConferenceLeft();
+        break;
+      }
       case "moderated": {
         const action = msg.action as string;
         const byName = msg.by_name as string;
@@ -489,8 +602,155 @@ export class NovaRtcSession {
     }
   }
 
+  async switchAudioInput(deviceId: string) {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+    });
+    const nextTrack = stream.getAudioTracks()[0];
+    if (!nextTrack) return;
+    nextTrack.enabled = !this.audioMuted;
+    if (this.audioSender) {
+      await this.audioSender.replaceTrack(nextTrack);
+    }
+    this.localStream?.getAudioTracks().forEach((t) => t.stop());
+    const videoTracks = this.localStream?.getVideoTracks() ?? [];
+    this.localStream = new MediaStream([nextTrack, ...videoTracks]);
+    this.restartAudioMonitor();
+    this.callbacks.onStateChange();
+  }
+
+  async switchVideoInput(deviceId: string): Promise<MediaStream | null> {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: deviceId
+        ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        : { width: { ideal: 1280 }, height: { ideal: 720 } },
+    });
+    const nextTrack = stream.getVideoTracks()[0];
+    if (!nextTrack) return null;
+    nextTrack.enabled = !this.videoMuted;
+    if (this.videoSender) {
+      await this.videoSender.replaceTrack(nextTrack);
+    }
+    this.localStream?.getVideoTracks().forEach((t) => t.stop());
+    const audioTracks = this.localStream?.getAudioTracks() ?? [];
+    this.localStream = new MediaStream([...audioTracks, nextTrack]);
+    this.callbacks.onStateChange();
+    return this.localStream;
+  }
+
+  async applyAudioProcessing(opts: { noiseSuppression: boolean; echoCancellation: boolean }) {
+    const track = this.localStream?.getAudioTracks()[0];
+    if (!track || !track.applyConstraints) return;
+    await track
+      .applyConstraints({
+        noiseSuppression: opts.noiseSuppression,
+        echoCancellation: opts.echoCancellation,
+        autoGainControl: opts.noiseSuppression,
+      })
+      .catch(() => undefined);
+  }
+
+  async setVideoQuality(quality: VideoQualityMode) {
+    this.videoQuality = quality;
+    if (quality === "audio_only") {
+      this.setVideoMuted(true);
+      this.callbacks.onStateChange();
+      return;
+    }
+    if (this.videoMuted) {
+      this.setVideoMuted(false);
+    }
+    if (this.videoSender && typeof this.videoSender.getParameters === "function") {
+      try {
+        const params = this.videoSender.getParameters();
+        if (!params.encodings || params.encodings.length === 0) {
+          params.encodings = [{}];
+        }
+        const scale = quality === "hd" ? 1 : quality === "sd" ? 2 : 4;
+        const maxBitrate = quality === "hd" ? 1_800_000 : quality === "sd" ? 700_000 : 250_000;
+        params.encodings[0].scaleResolutionDownBy = scale;
+        params.encodings[0].maxBitrate = maxBitrate;
+        await this.videoSender.setParameters(params).catch(() => undefined);
+      } catch {
+        // Not supported by every browser implementation
+      }
+    }
+    this.callbacks.onStateChange();
+  }
+
+  async collectConnectionStats(): Promise<ConnectionStats> {
+    const pc = this.pc;
+    if (!pc) {
+      return {
+        rttMs: null,
+        packetLossPct: null,
+        bitrateKbps: null,
+        resolution: null,
+        iceState: this.iceState,
+        quality: "fair",
+      };
+    }
+    try {
+      const report = await pc.getStats();
+      let rttMs: number | null = null;
+      let lost = 0;
+      let received = 0;
+      let bytesSent = 0;
+      let resolution: string | null = null;
+
+      report.forEach((stat) => {
+        if (stat.type === "candidate-pair" && stat.state === "succeeded" && typeof stat.currentRoundTripTime === "number") {
+          rttMs = Math.round(stat.currentRoundTripTime * 1000);
+        }
+        if (stat.type === "inbound-rtp" && stat.kind === "video") {
+          if (typeof stat.packetsLost === "number") lost += stat.packetsLost;
+          if (typeof stat.packetsReceived === "number") received += stat.packetsReceived;
+          if (typeof stat.frameWidth === "number" && typeof stat.frameHeight === "number" && stat.frameWidth > 0) {
+            resolution = `${stat.frameWidth}x${stat.frameHeight}`;
+          }
+        }
+        if (stat.type === "outbound-rtp" && typeof stat.bytesSent === "number") {
+          bytesSent += stat.bytesSent;
+        }
+      });
+
+      const now = performance.now();
+      let bitrateKbps: number | null = null;
+      if (this.lastStatsAt > 0 && now > this.lastStatsAt && bytesSent >= this.lastBytesSent) {
+        bitrateKbps = Math.round(((bytesSent - this.lastBytesSent) * 8) / (now - this.lastStatsAt));
+      }
+      this.lastBytesSent = bytesSent;
+      this.lastStatsAt = now;
+
+      const totalPkts = lost + received;
+      const packetLossPct = totalPkts > 0 ? Number(((lost / totalPkts) * 100).toFixed(1)) : 0;
+
+      let quality: "good" | "fair" | "poor" = "good";
+      if (this.iceState !== "connected" && this.iceState !== "completed") {
+        quality = "fair";
+      } else if ((rttMs !== null && rttMs > 280) || (packetLossPct !== null && packetLossPct > 5)) {
+        quality = "poor";
+      } else if ((rttMs !== null && rttMs > 120) || (packetLossPct !== null && packetLossPct > 2)) {
+        quality = "fair";
+      }
+
+      return { rttMs, packetLossPct, bitrateKbps, resolution, iceState: this.iceState, quality };
+    } catch {
+      return {
+        rttMs: null,
+        packetLossPct: null,
+        bitrateKbps: null,
+        resolution: null,
+        iceState: this.iceState,
+        quality: "fair",
+      };
+    }
+  }
+
   setAudioMuted(muted: boolean) {
     this.audioMuted = muted;
+    this.lastMuteToggleAt = Date.now();
+    this.loudMutedStreak = 0;
     this.localStream?.getAudioTracks().forEach((t) => {
       t.enabled = !muted;
     });
@@ -573,12 +833,29 @@ export class NovaRtcSession {
     this.callbacks.onStateChange();
   }
 
+  private restartAudioMonitor() {
+    if (this.levelTimer !== null) {
+      clearInterval(this.levelTimer);
+      this.levelTimer = null;
+    }
+    this.monitorTrack?.stop();
+    this.monitorTrack = null;
+    this.audioCtx?.close().catch(() => undefined);
+    this.audioCtx = null;
+    this.startAudioLevelMonitor();
+  }
+
   private startAudioLevelMonitor() {
-    if (this.levelTimer !== null || !this.localStream?.getAudioTracks().length) return;
+    const audioTrack = this.localStream?.getAudioTracks()[0];
+    if (this.levelTimer !== null || !audioTrack) return;
     try {
       const ctx = new AudioContext();
       this.audioCtx = ctx;
-      const source = ctx.createMediaStreamSource(this.localStream);
+      // Cloned monitor track lets us run talk-while-muted checks locally while keeping the RTC track strictly muted.
+      const monitor = audioTrack.clone();
+      monitor.enabled = true;
+      this.monitorTrack = monitor;
+      const source = ctx.createMediaStreamSource(new MediaStream([monitor]));
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       source.connect(analyser);
@@ -586,6 +863,11 @@ export class NovaRtcSession {
       let lastLevel = 0;
 
       this.levelTimer = window.setInterval(() => {
+        analyser.getByteFrequencyData(bins);
+        let sum = 0;
+        for (let i = 0; i < bins.length; i++) sum += bins[i];
+        const norm = Math.min(1, sum / (bins.length * 128));
+
         if (this.audioMuted) {
           if (lastLevel > 0) {
             lastLevel = 0;
@@ -597,12 +879,22 @@ export class NovaRtcSession {
               audio_level: 0,
             });
           }
+          const now = Date.now();
+          if (
+            this.talkWhileMutedEnabled &&
+            now - this.lastMuteToggleAt > 3000 &&
+            now - this.lastTalkWhileMutedAlertAt > 30000
+          ) {
+            this.loudMutedStreak = norm > 0.25 ? this.loudMutedStreak + 1 : 0;
+            if (this.loudMutedStreak >= 3) {
+              this.loudMutedStreak = 0;
+              this.lastTalkWhileMutedAlertAt = now;
+              this.callbacks.onTalkWhileMuted?.();
+            }
+          }
           return;
         }
-        analyser.getByteFrequencyData(bins);
-        let sum = 0;
-        for (let i = 0; i < bins.length; i++) sum += bins[i];
-        const norm = Math.min(1, sum / (bins.length * 128));
+        this.loudMutedStreak = 0;
         if (Math.abs(norm - lastLevel) > 0.08 || (norm > 0.12 && lastLevel > 0.12)) {
           lastLevel = norm;
           this.send({
@@ -625,6 +917,8 @@ export class NovaRtcSession {
       clearInterval(this.levelTimer);
       this.levelTimer = null;
     }
+    this.monitorTrack?.stop();
+    this.monitorTrack = null;
     this.audioCtx?.close().catch(() => undefined);
     this.audioCtx = null;
     this.screenTrack?.stop();

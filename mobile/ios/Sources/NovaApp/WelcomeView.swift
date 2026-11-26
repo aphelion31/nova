@@ -39,8 +39,8 @@ struct WelcomeView: View {
                     }
                 }
                 .padding()
-                .background(Color.gray.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .background(Color(red: 0x14 / 255.0, green: 0x14 / 255.0, blue: 0x14 / 255.0))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Recent Meetings")

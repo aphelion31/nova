@@ -15,7 +15,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           name="description"
           content="Nova — Lightweight Rust + str0m SFU + React Router WebRTC video conferencing"
         />
-        <meta name="theme-color" content="#0b0f17" />
+        <meta name="theme-color" content="#040404" />
         <title>Nova Meet</title>
         <link rel="icon" type="image/svg+xml" href="/brand-assets/favicon.svg" />
         <link rel="apple-touch-icon" href="/brand-assets/icon.svg" />
@@ -45,7 +45,7 @@ export default function App() {
 
 export function HydrateFallback() {
   return (
-    <div className="grid min-h-dvh place-items-center bg-[#0b0f17] text-sm text-slate-400">
+    <div className="grid min-h-dvh place-items-center bg-[#040404] text-sm text-[#A3A3A3]">
       Loading Nova…
     </div>
   );
