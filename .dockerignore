@@ -1,0 +1,12 @@
+target/
+.git/
+storage/
+*.db*
+.env
+web/node_modules/
+web/build/
+web/.react-router/
+mobile/
+docs/screenshots/
+rust/app-cases/
+.DS_Store
