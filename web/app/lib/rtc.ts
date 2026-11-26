@@ -1,3 +1,9 @@
+import {
+  attachReceiverE2ee,
+  attachSenderE2ee,
+  supportsEncodedInsertableStreams,
+} from "~/lib/e2ee";
+
 export interface IceServerConfig {
   urls: string[];
 }
@@ -397,9 +403,10 @@ export class NovaRtcSession {
 
   private async initPeerConnection() {
     if (this.pc) return;
+    const useInsertable = supportsEncodedInsertableStreams();
     const pc = new RTCPeerConnection({
       iceServers: this.iceServers.length > 0 ? this.iceServers : [{ urls: ["stun:stun.l.google.com:19302"] }],
-      ...(this.e2eeKey ? ({ encodedInsertableStreams: true } as RTCConfiguration) : {}),
+      ...(useInsertable ? ({ encodedInsertableStreams: true } as RTCConfiguration) : {}),
     });
     this.pc = pc;
 
@@ -409,6 +416,9 @@ export class NovaRtcSession {
     };
 
     pc.ontrack = (ev) => {
+      if (useInsertable && ev.receiver) {
+        attachReceiverE2ee(ev.receiver, () => this.e2eeKey);
+      }
       const mid = ev.transceiver?.mid || "";
       const meta = this.trackMap[mid];
       const streamId = ev.streams[0]?.id;
@@ -441,6 +451,7 @@ export class NovaRtcSession {
     if (audioTrack) {
       audioTrack.enabled = !this.audioMuted;
       this.audioSender = pc.addTrack(audioTrack, this.localStream!);
+      if (useInsertable) attachSenderE2ee(this.audioSender, () => this.e2eeKey);
     } else {
       pc.addTransceiver("audio", { direction: "recvonly" });
     }
@@ -448,6 +459,7 @@ export class NovaRtcSession {
     if (videoTrack) {
       videoTrack.enabled = !this.videoMuted;
       this.videoSender = pc.addTrack(videoTrack, this.localStream!);
+      if (useInsertable) attachSenderE2ee(this.videoSender, () => this.e2eeKey);
     } else {
       pc.addTransceiver("video", { direction: "recvonly" });
     }
@@ -525,6 +537,9 @@ export class NovaRtcSession {
         await this.screenSender.replaceTrack(track);
       } else {
         this.screenSender = this.pc.addTrack(track, stream);
+        if (supportsEncodedInsertableStreams()) {
+          attachSenderE2ee(this.screenSender, () => this.e2eeKey);
+        }
         await this.sendLocalOffer();
       }
     }

@@ -2,6 +2,8 @@ package dev.nova.meet
 
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +37,8 @@ class NovaClientController(
     private val prefs = context.getSharedPreferences("nova_prefs", Context.MODE_PRIVATE)
     private var core = NovaClientCore("standup")
     private val client = OkHttpClient()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var initialOfferSent = false
     private var ws: WebSocket? = null
 
     private val _snapshot = MutableStateFlow(core.snapshot())
@@ -118,6 +122,7 @@ class NovaClientController(
             val parsed = parseNovaMeetingUrl(meetingUrl)
             core = NovaClientCore(parsed.room)
             _snapshot.value = core.snapshot()
+            initialOfferSent = false
             _displayName.value = displayName
             _audioOnly.value = audioOnlyMode
             if (audioOnlyMode) _videoMuted.value = true
@@ -144,13 +149,35 @@ class NovaClientController(
                 override fun onMessage(webSocket: WebSocket, text: String) {
                     runCatching {
                         val obj = JSONObject(text)
-                        if (obj.optString("type") == "reaction") {
-                            val r = MobileReaction(
-                                id = System.nanoTime(),
-                                emoji = obj.optString("emoji"),
-                                senderName = obj.optString("display_name")
-                            )
-                            _reactions.value = (_reactions.value + r).takeLast(6)
+                        when (obj.optString("type")) {
+                            "reaction" -> {
+                                val rid = System.nanoTime()
+                                val r = MobileReaction(
+                                    id = rid,
+                                    emoji = obj.optString("emoji"),
+                                    senderName = obj.optString("display_name")
+                                )
+                                _reactions.value = (_reactions.value + r).takeLast(6)
+                                mainHandler.postDelayed({
+                                    _reactions.value = _reactions.value.filterNot { it.id == rid }
+                                }, 2400L)
+                            }
+                            "moderated" -> {
+                                when (obj.optString("action")) {
+                                    "mute_audio" -> {
+                                        _audioMuted.value = true
+                                        rtcAdapter?.setAudioMuted(true)
+                                    }
+                                    "mute_video" -> {
+                                        _videoMuted.value = true
+                                        rtcAdapter?.setVideoMuted(true)
+                                    }
+                                    "kick" -> {
+                                        leave()
+                                        return
+                                    }
+                                }
+                            }
                         }
                         val next = core.applyServerJson(text)
                         _snapshot.value = next
@@ -162,8 +189,9 @@ class NovaClientController(
                                 webSocket.send(core.buildRtcRenegotiateAnswerPayload(ans))
                             }
                         }
-                        if (active && next.sdpAnswer == null) {
-                            rtcAdapter?.createInitialOffer { offerSdp ->
+                        if (active && rtcAdapter != null && !initialOfferSent) {
+                            initialOfferSent = true
+                            rtcAdapter.createInitialOffer { offerSdp ->
                                 webSocket.send(core.buildRtcOfferPayload(offerSdp))
                             }
                         }
@@ -286,6 +314,7 @@ class NovaClientController(
         ws?.close(1000, "User left")
         ws = null
         rtcAdapter?.stop()
+        initialOfferSent = false
         _connected.value = false
         _carMode.value = false
         _selectedRoomUrl.value = null

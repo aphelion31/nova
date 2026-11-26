@@ -57,6 +57,8 @@ impl RoomSnapshot {
     }
 
     pub fn apply_server_event(&mut self, ev: &ServerMessage) {
+        self.sdp_answer = None;
+        self.pending_renegotiate_sdp = None;
         match ev {
             ServerMessage::Joined {
                 self_id,
@@ -233,5 +235,38 @@ mod tests {
 
         snap.apply_server_event(&ServerMessage::ParticipantLeft { peer_id: "p2".into() });
         assert_eq!(snap.active_speaker_id.as_deref(), Some("p1"));
+    }
+
+    #[test]
+    fn transient_sdp_fields_reset_on_subsequent_events() {
+        let mut snap = RoomSnapshot::new("standup");
+        snap.apply_server_event(&ServerMessage::RtcAnswer {
+            sdp: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\n".into(),
+        });
+        assert!(snap.sdp_answer.is_some());
+        assert!(snap.pending_renegotiate_sdp.is_none());
+
+        snap.apply_server_event(&ServerMessage::ChatMessage {
+            message: ChatMessage {
+                id: "m1".into(),
+                sender_id: "p1".into(),
+                sender_name: "Alice".into(),
+                recipient_id: None,
+                body: "hello".into(),
+                created_at: 1,
+            },
+        });
+        assert!(snap.sdp_answer.is_none());
+
+        snap.apply_server_event(&ServerMessage::RtcRenegotiateOffer {
+            sdp: "v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\n".into(),
+            track_map: HashMap::new(),
+        });
+        assert!(snap.pending_renegotiate_sdp.is_some());
+
+        snap.apply_server_event(&ServerMessage::ParticipantUpdated {
+            participant: mk_participant("p1", 0.1, false),
+        });
+        assert!(snap.pending_renegotiate_sdp.is_none());
     }
 }

@@ -1,4 +1,4 @@
-// End-to-end 2-peer WebRTC SFU verification & 2x retina screenshot capture for Nova.
+// End-to-end 2-peer WebRTC SFU verification, live E2EE check, & 2x retina screenshot capture for Nova.
 // Run: BASE=http://127.0.0.1:3000 node tools/e2e.mjs
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -16,6 +16,15 @@ const { chromium } = require(playwrightPath);
 
 const BASE = process.env.BASE || "http://127.0.0.1:3000";
 const SHOT_DIR = path.resolve("docs/screenshots");
+
+async function seedDemoRoom(payload) {
+  const res = await fetch(`${BASE}/api/rooms`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  assert.equal(res.ok, true, `failed to seed demo room ${payload.name}: HTTP ${res.status}`);
+}
 
 async function ensureChromiumExecutable() {
   if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
@@ -67,7 +76,11 @@ function attachListeners(page, label) {
 }
 
 try {
-  const room = `nova-e2e-${Date.now()}`;
+  // Seed clean rooms first so home.png displays realistic recent rooms without timestamps/smoke junk.
+  await seedDemoRoom({ name: "product-standup", subject: "Product Standup" });
+  await seedDemoRoom({ name: "design-review", subject: "Design Review", password: "nova-demo" });
+
+  const room = process.env.E2E_ROOM || "weekly-standup";
   const ctxA = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 2,
@@ -91,6 +104,7 @@ try {
   console.log("Captured login.png");
 
   await pageA.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await pageA.getByText("2 rooms").waitFor({ timeout: 5000 });
   await pageA.waitForTimeout(250);
   await pageA.screenshot({ path: path.join(SHOT_DIR, "home.png") });
   console.log("Captured home.png");
@@ -172,7 +186,32 @@ try {
   console.log("Captured meeting-whiteboard.png");
   await pageA.getByRole("button", { name: "Close whiteboard" }).click();
 
-  // 6. Drop-in Jitsi External API embed test
+  // 6. Live E2EE passphrase & WebRTC encoded transform verification (both moderator Alice and guest Bob)
+  await pageA.getByRole("button", { name: "Security & E2EE" }).click();
+  await pageA.getByPlaceholder("Shared E2EE key passphrase...").fill("nova-e2ee-secret");
+  await pageA.getByRole("button", { name: "Apply" }).click();
+  await pageA.getByRole("button", { name: "Close security modal" }).click();
+
+  await pageB.getByRole("button", { name: "Security & E2EE" }).click();
+  assert.equal(await pageB.getByText("Enable waiting lobby").count(), 0, "non-moderator should not see moderator lobby toggle");
+  await pageB.getByPlaceholder("Shared E2EE key passphrase...").fill("nova-e2ee-secret");
+  await pageB.getByRole("button", { name: "Apply" }).click();
+  await pageB.getByRole("button", { name: "Close security modal" }).click();
+
+  await pageA.getByText("E2EE", { exact: true }).waitFor({ timeout: 8000 });
+  await pageB.getByText("E2EE", { exact: true }).waitFor({ timeout: 8000 });
+  await pageA.waitForTimeout(600);
+  await pageA.waitForFunction(() => {
+    const vids = Array.from(document.querySelectorAll("video"));
+    return vids.length >= 2 && vids.every((v) => v.readyState >= 2 && v.videoWidth > 0);
+  }, undefined, { timeout: 10000 });
+  await pageB.waitForFunction(() => {
+    const vids = Array.from(document.querySelectorAll("video"));
+    return vids.length >= 2 && vids.every((v) => v.readyState >= 2 && v.videoWidth > 0);
+  }, undefined, { timeout: 10000 });
+  console.log("Verified live E2EE key derivation & continuous 2-peer video decode");
+
+  // 7. Drop-in Jitsi External API embed test
   const embedPage = await ctxA.newPage();
   attachListeners(embedPage, "Embed");
   await embedPage.setContent(`<!doctype html><html><head><link rel="icon" href="data:,"></head><body style="margin:0;height:100vh">
@@ -193,7 +232,7 @@ try {
   await embedPage.evaluate(() => window.api.dispose());
   await embedPage.close();
 
-  // 7. Mobile viewport responsive check (zero horizontal overflow)
+  // 8. Mobile viewport responsive check (zero horizontal overflow)
   const mobilePage = await ctxA.newPage();
   attachListeners(mobilePage, "Mobile");
   await mobilePage.setViewportSize({ width: 375, height: 812 });
@@ -206,7 +245,7 @@ try {
   assert.deepEqual(pageErrors, [], `page errors: ${pageErrors.join("; ")}`);
   assert.deepEqual(failedRequests, [], `failed requests: ${failedRequests.join("; ")}`);
 
-  console.log("PASS: 2-peer WebRTC str0m SFU, chat, polls, hand, whiteboard, external_api.js, 6 screenshots, 0 errors");
+  console.log("PASS: 2-peer WebRTC str0m SFU, chat, polls, hand, whiteboard, live E2EE, external_api.js, 6 screenshots, 0 errors");
   await ctxA.close();
   await ctxB.close();
 } finally {

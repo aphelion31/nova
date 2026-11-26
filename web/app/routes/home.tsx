@@ -160,7 +160,9 @@ export default function HomePage() {
           <section className="rounded-2xl border border-white/10 bg-[#121826] p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-bold text-white">{t.recentRooms}</h2>
-              <span className="text-xs text-slate-400 tabular-nums">{rooms.length} rooms</span>
+              <span className="text-xs text-slate-400 tabular-nums">
+                {rooms.length} {rooms.length === 1 ? "room" : "rooms"}
+              </span>
             </div>
 
             {rooms.length === 0 ? (

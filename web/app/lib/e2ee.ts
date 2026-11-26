@@ -1,3 +1,5 @@
+const attachedEndpoints = new WeakSet<object>();
+
 export async function deriveRoomAesKey(passphrase: string, room: string, generation = 1): Promise<CryptoKey> {
   const enc = new TextEncoder();
   const baseKey = await crypto.subtle.importKey("raw", enc.encode(passphrase), "HKDF", false, ["deriveKey"]);
@@ -20,14 +22,21 @@ export function supportsEncodedInsertableStreams(): boolean {
   return typeof proto.createEncodedStreams === "function";
 }
 
-export function attachSenderE2ee(sender: RTCRtpSender, key: CryptoKey): void {
+export function attachSenderE2ee(sender: RTCRtpSender, getKey: () => CryptoKey | null): void {
+  if (attachedEndpoints.has(sender)) return;
   const anySender = sender as unknown as {
     createEncodedStreams?: () => { readable: ReadableStream; writable: WritableStream };
   };
   if (typeof anySender.createEncodedStreams !== "function") return;
+  attachedEndpoints.add(sender);
   const { readable, writable } = anySender.createEncodedStreams();
   const transform = new TransformStream({
     async transform(frame: { data: ArrayBuffer }, controller) {
+      const key = getKey();
+      if (!key) {
+        controller.enqueue(frame);
+        return;
+      }
       try {
         const iv = crypto.getRandomValues(new Uint8Array(12));
         const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, frame.data);
@@ -44,14 +53,21 @@ export function attachSenderE2ee(sender: RTCRtpSender, key: CryptoKey): void {
   readable.pipeThrough(transform).pipeTo(writable).catch(() => undefined);
 }
 
-export function attachReceiverE2ee(receiver: RTCRtpReceiver, key: CryptoKey): void {
+export function attachReceiverE2ee(receiver: RTCRtpReceiver, getKey: () => CryptoKey | null): void {
+  if (attachedEndpoints.has(receiver)) return;
   const anyReceiver = receiver as unknown as {
     createEncodedStreams?: () => { readable: ReadableStream; writable: WritableStream };
   };
   if (typeof anyReceiver.createEncodedStreams !== "function") return;
+  attachedEndpoints.add(receiver);
   const { readable, writable } = anyReceiver.createEncodedStreams();
   const transform = new TransformStream({
     async transform(frame: { data: ArrayBuffer }, controller) {
+      const key = getKey();
+      if (!key) {
+        controller.enqueue(frame);
+        return;
+      }
       try {
         const buf = new Uint8Array(frame.data);
         if (buf.byteLength > 28) {
@@ -60,7 +76,7 @@ export function attachReceiverE2ee(receiver: RTCRtpReceiver, key: CryptoKey): vo
           frame.data = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
         }
       } catch {
-        // drop/skip decrypt error cleanly
+        // ignore unencrypted key rotation frame mismatch
       }
       controller.enqueue(frame);
     },

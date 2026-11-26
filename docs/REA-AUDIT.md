@@ -13,9 +13,11 @@ Recorded using REA MCP tools against the compiled `nova` release binary (`target
 | `pie` (ASLR) | `enabled` | `MH_PIE` is set |
 | `allow_stack_execution` | `disabled` | `MH_ALLOW_STACK_EXECUTION` is clear |
 | `no_heap_execution` | `disabled` | `MH_NO_HEAP_EXECUTION` is clear |
-| `stack_protector` | `enabled` | Undefined symbol `___stack_chk_fail` present |
-| `code_signature_present` | `enabled` | `LC_CODE_SIGNATURE` load command present |
+| `restrict_segment` | `disabled` | No `__RESTRICT` segment |
+| `stack_protector` | `enabled` | Undefined symbol `___stack_chk_fail` is present |
+| `code_signature_present` | `enabled` | `LC_CODE_SIGNATURE` load command is present |
 | `encrypted` | `disabled` | No `LC_ENCRYPTION_INFO` command present |
+| `hardened_runtime` | `unknown` | `CodeDirectory` flags belong to `inspect_signature` |
 
 ## 2. Release Exposure Audits
 
@@ -24,10 +26,10 @@ Recorded using REA MCP tools against the compiled `nova` release binary (`target
 - **Result**: `exposed: 0`, `no_exposure_observed_in_assessed_checks: true` (`not_observed: 4`, `not_applicable: 6`, `unknown: 2`, `not_assessed: 3`) — zero `.dSYM`, `.pdb`, debug companions, or embedded JS source maps.
 
 ### React Router 8 PWA Bundle (`web/build/client`)
-- **Evidence ID**: `ev_509b69b4ab7e9ec504edfcb09b30ff1682f9b7823bce16657180e44577c7c445`
-- **SHA-256**: `003067e38db0d53bc3d4eff17f5998edb71e4adc7258f92a9545d39aed0b57fa`
-- **Result**: `exposed: 0`, `no_exposure_observed_in_assessed_checks: true` (`22` members scanned, `0` credential markers exposed).
+- **Evidence ID**: `ev_bd5dddf91bd4fc57140f6077e39e2fca87acf4f0f166e588beea2bc74ad0b9c0`
+- **SHA-256**: `3c36b2736bba661f4c99a1bc1d8350b00b86c046f5dd9dd1797f5baae0d15f12`
+- **Result**: `exposed: 0`, `no_exposure_observed_in_assessed_checks: true` (`22` scanned text members, `0` credential markers exposed).
 
 ### Embedded Crate Metadata Probe (`inspect_rust_binary`)
-- **Evidence IDs**: `ev_3581b562dd2fd1041b4784506b4c25348ad8da65e6b60bdc970c6d668fb103b2` / view `ev_9ff8a13c76efe3e0be246ec9010b78db2306e30d982ddb5926b0099c6a38853b`
-- **Observation**: Stripped release binary (`11,990,832` bytes), zero `.dep-v0` (`cargo-auditable`) dependency list shipped inside the binary.
+- **Evidence ID**: `ev_6952fc0b7b0936454d68def55e3806a65eb834629c7beaca26d93142642fc60b`
+- **Observation**: Stripped release binary (`11,990,832` bytes), zero `.dep-v0` (`cargo-auditable`) dependency list shipped inside the binary; inferred `rustc` commit `88d9e12ae178fab0fb5cc050a94da85685d449ea` at offset `8570040`.

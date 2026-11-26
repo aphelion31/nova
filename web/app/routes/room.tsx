@@ -40,6 +40,11 @@ export default function RoomRoute({ embedMode = false }: { embedMode?: boolean }
   const blurRef = useRef<BlurPipeline | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const prevMsgCountRef = useRef(0);
+  const activePanelRef = useRef<PanelTab>(null);
+
+  useEffect(() => {
+    activePanelRef.current = activePanel;
+  }, [activePanel]);
 
   const initialName = searchParams.get("name") || "";
   const jwtToken = searchParams.get("jwt") || undefined;
@@ -97,7 +102,7 @@ export default function RoomRoute({ embedMode = false }: { embedMode?: boolean }
         onStateChange: () => {
           forceUpdate();
           const msgLen = session.messages.length;
-          if (msgLen > prevMsgCountRef.current && activePanel !== "chat") {
+          if (msgLen > prevMsgCountRef.current && activePanelRef.current !== "chat") {
             setUnreadChat((u) => u + (msgLen - prevMsgCountRef.current));
           }
           prevMsgCountRef.current = msgLen;
@@ -135,7 +140,7 @@ export default function RoomRoute({ embedMode = false }: { embedMode?: boolean }
         displayName: opts.displayName,
       });
     },
-    [activePanel, forceUpdate, handleLeave, jwtToken, roomName]
+    [forceUpdate, handleLeave, jwtToken, roomName]
   );
 
   // Auto-join immediately in embed mode when name is supplied or default guest.
@@ -485,6 +490,7 @@ export default function RoomRoute({ embedMode = false }: { embedMode?: boolean }
 
       {securityOpen && session ? (
         <SecurityModal
+          isModerator={session.isModerator}
           security={session.security}
           onUpdate={(payload) => session.send({ type: "room_security", ...payload })}
           onEnableE2eePassphrase={(passphrase) => {

@@ -1,5 +1,6 @@
 package dev.nova.meet.ui
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -28,6 +30,7 @@ import dev.nova.meet.NovaClientController
 fun ChatPollsSheet(controller: NovaClientController, onDismiss: () -> Unit) {
     val snapshot by controller.snapshot.collectAsState()
     var draft by remember { mutableStateOf("") }
+    var dmRecipientId by remember { mutableStateOf<String?>(null) }
     var pollQuestion by remember { mutableStateOf("") }
     var pollOptA by remember { mutableStateOf("Yes") }
     var pollOptB by remember { mutableStateOf("No") }
@@ -39,9 +42,13 @@ fun ChatPollsSheet(controller: NovaClientController, onDismiss: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            LazyColumn(
+                modifier = Modifier.weight(1f, fill = false),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 items(snapshot.messages, key = { it.id }) { msg ->
-                    Text("${msg.senderName}: ${msg.body}")
+                    val prefix = if (msg.recipientId != null) "[DM] " else ""
+                    Text("$prefix${msg.senderName}: ${msg.body}")
                 }
                 items(snapshot.polls, key = { it.id }) { poll ->
                     Column {
@@ -68,15 +75,34 @@ fun ChatPollsSheet(controller: NovaClientController, onDismiss: () -> Unit) {
                     pollQuestion = ""
                 }) { Text("Poll") }
             }
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (dmRecipientId == null) {
+                    Button(onClick = { dmRecipientId = null }) { Text("To: Everyone") }
+                } else {
+                    OutlinedButton(onClick = { dmRecipientId = null }) { Text("Everyone") }
+                }
+                snapshot.participants
+                    .filter { it.id != snapshot.selfId }
+                    .forEach { peer ->
+                        if (dmRecipientId == peer.id) {
+                            Button(onClick = { dmRecipientId = peer.id }) { Text("DM: ${peer.displayName}") }
+                        } else {
+                            OutlinedButton(onClick = { dmRecipientId = peer.id }) { Text("DM: ${peer.displayName}") }
+                        }
+                    }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = draft,
                     onValueChange = { draft = it },
                     modifier = Modifier.weight(1f),
-                    label = { Text("Message") }
+                    label = { Text(if (dmRecipientId == null) "Message" else "Direct message") }
                 )
                 Button(onClick = {
-                    controller.sendChat(draft)
+                    controller.sendChat(draft, dmRecipientId)
                     draft = ""
                 }) {
                     Text("Send")

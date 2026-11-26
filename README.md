@@ -19,14 +19,14 @@
 
 ---
 
-### ⚡ Single binary, ~10–12 MiB RAM locally
+### ⚡ Single binary, ~10–22 MiB RAM locally
 
-No Prosody, no Java JVM (Jicofo/JVB), no Redis, and zero external database process required by default. The HTTP/WebSocket signaling server, multiplexed UDP WebRTC SFU, SQLite persistence, and static React Router PWA run from one compiled executable (**11.44 MiB** release binary + **0.54 MiB** `web/build/client` bundle on macOS `arm64`, starting in **48 ms** at **10.23 MiB** idle / **12.16 MiB** post-load RSS).
+No Prosody, no Java JVM (Jicofo/JVB), no Redis, and zero external database process required by default. The HTTP/WebSocket signaling server, multiplexed UDP WebRTC SFU, SQLite persistence, and static React Router PWA run out of one compiled executable (**11.44 MiB** release binary + **488.9 KiB** `web/build/client` bundle on macOS `arm64`, starting in **27 ms** at **10.27 MiB** idle / **22.38 MiB** post-load RSS).
 
 ### 🎥 Real `str0m` WebRTC SFU & Collaboration
 
 - **Prejoin & Meeting Modes:** Live camera/mic preview, device switching, client-side background blur, Tile / Speaker + Filmstrip / Spotlight Pin layouts, active speaker detection, and local WebM recording.
-- **Security & Access Control:** Argon2id (`Algorithm::Argon2id`) host accounts with HMAC-SHA256 `HttpOnly` sessions, Jitsi-compatible HS256 room JWT tokens, room password lock, knock lobby with moderator Admit/Decline, and HKDF + AES-256-GCM E2EE (`nova-core::e2ee` + WebRTC Encoded Transform).
+- **Security & Access Control:** Argon2id (`Algorithm::Argon2id`) host accounts with HMAC-SHA256 `HttpOnly` sessions, Jitsi-compatible HS256 room JWT tokens, room password lock, knock lobby with moderator Admit/Decline, and HKDF + AES-256-GCM E2EE (`nova-core::e2ee` + WebRTC Encoded Transform for all room participants).
 - **Collaboration:** Public chat & private DMs persisted in SQLite, live polls with percentage bars, raise hand, floating emoji reactions, SFU-isolated breakout rooms, collaborative whiteboard with PNG export, speaker talk-time stats, and EN/ID localization.
 - **Drop-in Jitsi Compatibility:** Serves `/external_api.js` (`JitsiMeetExternalAPI` / `NovaMeetExternalAPI`), `/config.js`, `/interface_config.js`, and `/embed/{room}` iframe bridge.
 
@@ -38,7 +38,7 @@ Rather than bundling React Native (`0.85` + Hermes + Metro) or Flutter (Dart VM 
 
 ## UI Screenshots
 
-All screenshots below were captured cleanly at `1440×900` (`2×` retina DPR) against the local `--release` `nova serve` binary via headless Chromium (`tools/e2e.mjs`) with **two concurrent WebRTC peers connected through the `str0m` SFU**, zero console errors, zero page errors, and zero failed HTTP requests:
+All screenshots below were captured cleanly at `1440×900` (`2×` retina DPR) against the local `--release` `nova serve` binary (`WEB_DIR=web/build/client`) via headless Chromium (`tools/e2e.mjs`) with **two concurrent WebRTC peers connected through the `str0m` SFU** + live E2EE transform verification, zero console errors, zero page errors, and zero failed HTTP requests:
 
 ### Welcome & Host Sign In (`/`, `/login`)
 
@@ -62,29 +62,44 @@ All screenshots below were captured cleanly at `1440×900` (`2×` retina DPR) ag
 
 ## Original vs Rewrite Size Comparison
 
-Measured directly on the checked-out upstream [`jitsi/jitsi-meet`](https://github.com/jitsi/jitsi-meet) tree (`../jitsi-meet`) vs `nova` via [`tools/bench.sh`](tools/bench.sh):
+Measured directly on the checked-out upstream [`jitsi/jitsi-meet`](https://github.com/jitsi/jitsi-meet) tree (`../jitsi-meet`) vs `nova` (`crates/`, `web/`, `mobile/`, and local `--release` build on macOS `arm64`) via [`tools/bench.sh`](tools/bench.sh):
 
-| Dimension | Jitsi Meet (`../jitsi-meet`) | Nova Rewrite (`nova`) | Reduction / Delta |
+| Dimension | Jitsi Meet (`../jitsi-meet`) | Nova Rewrite (`nova`) | Reduction / Ratio |
 | --- | --- | --- | --- |
-| **Source code** | 2,170 files · 272,332 LOC (`.ts`/`.tsx`/`.js`/`.scss`/`.java`/`.swift`/`.kt`, excl. Prosody/Jicofo/JVB repos) | 54 files · 10,132 LOC (`4,572` Rust + `3,554` Web + `2,006` Mobile native UI) | **26.9× fewer LOC** (-96.3%) |
-| **Direct frontend npm deps** | 179 npm packages | 12 npm packages (`4` runtime + `8` dev) | **14.9× fewer npm deps** |
+| **Total authored source** (excl. `.git`, deps, build, generated) | 2,425 files · 306,507 LOC (`9.58 MiB` `.ts`/`.tsx`/`.js`/`.jsx`/`.scss`/`.css`/`.java`/`.swift`/`.kt`, excl. Prosody/Jicofo/JVB server repos) | 56 files · 10,436 LOC (`0.36 MiB`: `4,661` Rust/SQL + `3,608` Web + `2,167` SwiftUI/Compose) | **29.4× fewer LOC** (-96.6%) |
+| **Clean source tree size** (excl. `.git`, deps, build) | `154.69 MiB` (`162.20 MB`) | `2.05 MiB` (`2.15 MB`) | **75× smaller** |
+| **On disk / Built artifacts** | `289.07 MiB` checkout w/`.git` (+ multi-container JVM/Lua images) | **`11.44 MiB`** release binary + **`488.9 KiB`** (`0.48 MiB`) `web/build/client` | Single binary + static PWA |
+| **Direct dependencies** | 179 npm packages (`116` runtime + `63` dev) + Prosody + Jicofo + JVB Java | 26 Rust crates + 12 npm packages (`4` runtime + `8` dev) | **4.7× fewer** vs npm alone |
 | **Runtime processes** | Nginx + Prosody (Lua) + Jicofo (Java) + JVB Videobridge (Java) | **1 binary** (`nova` w/ embedded SQLite + `str0m` SFU) | Single process |
-| **Built artifacts** | Multi-container JVM + Lua + Webpack bundles | **`11.44 MiB`** binary + **`548 KiB`** `web/build/client` | Self-contained binary + static PWA |
-| **Cold startup to `/health`** | Multi-service JVM/Prosody boot | **`48 ms`** | Instant readiness |
-| **Memory RSS (macOS `arm64`)** | Multi-container JVM/Lua footprint | **`10.23 MiB`** idle · **`12.16 MiB`** post-load | Fits in `<15 MiB` |
+| **Cold startup to `/health`** | Multi-service JVM/Prosody boot | **`27 ms`** | Instant readiness |
+| **Local RSS memory** (macOS `arm64` `--release`) | Multi-container JVM/Lua footprint | **`10.27 MiB`** (`10,512 KiB`) idle · **`22.38 MiB`** (`22,912 KiB`) post-load | Fits in `<25 MiB` |
+
+<details>
+<summary>Breakdown of Nova source layers & built artifacts</summary>
+
+- **Source code (`56` authored files · `10,436` LOC · `0.36 MiB`):**
+  - Rust backend + core (`crates/`, `.rs` + `.sql`): `15` files · `4,661` LOC (`155.0 KiB`)
+  - Web PWA (`web/app/`, `.ts`/`.tsx`/`.css`): `21` files · `3,608` LOC (`127.0 KiB`)
+  - Native mobile UI (`mobile/ios/Sources/NovaApp` + `mobile/android/.../dev` + `AndroidManifest.xml`): `20` files · `2,167` LOC (`86.7 KiB`)
+  - UniFFI generated bindings: Swift `103.8 KiB` (`mobile/ios/Generated/`), Kotlin `105.8 KiB` (`mobile/android/.../uniffi/nova_core/`)
+- **Built outputs (macOS `arm64` `--release`):**
+  - Release executable (`target/release/nova`): **`11,990,832` bytes** (`11.44 MiB`)
+  - Total `web/build/client`: **`500,589` bytes** (`488.9 KiB` / `0.48 MiB`) — JS/CSS chunks (`assets/`): `482.7 KiB`, custom geometric SVGs (`brand-assets/`): `2.6 KiB`
+
+</details>
 
 ---
 
 ## Benchmark & Shipped-Artifact Audit
 
-Measured with [`tools/bench.sh`](tools/bench.sh) on macOS `arm64` (`oha`, `5 s`, `32` concurrent connections against `target/release/nova serve`):
+Measured with [`tools/bench.sh`](tools/bench.sh) on macOS `arm64` (`oha --no-tui -z 5s -c 32` against `target/release/nova serve`):
 
-| Endpoint | Throughput | Average Latency | HTTP 200 Responses (5s) |
-| --- | ---: | ---: | ---: |
-| `GET /api/status` | **82,833 req/s** | `0.38 ms` | `414,485` |
-| `GET /external_api.js` | **145,195 req/s** | `0.22 ms` | `726,376` |
+| Endpoint | Throughput | Average | `p50` | `p95` | `p99` | HTTP 200 Responses |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `GET /api/status` | **114,835 req/s** | `0.28 ms` | `0.25 ms` | `0.50 ms` | `0.90 ms` | `574,850` |
+| `GET /external_api.js` | **198,533 req/s** | `0.16 ms` | `0.13 ms` | `0.34 ms` | `0.67 ms` | `993,250` |
 
-Security hardening and release exposure verified via REA MCP (`docs/REA-AUDIT.md`) on `target/release/nova` (`11,990,832` bytes, `MH_PIE`, stack protector, non-executable stack/heap, code signature present, `exposed: 0`) and `web/build/client` (`exposed: 0`, `22` scanned members).
+Security hardening and release exposure verified via REA MCP ([`docs/REA-AUDIT.md`](docs/REA-AUDIT.md)) on `target/release/nova` (`11,990,832` bytes, `MH_PIE` enabled, `stack_protector` enabled, `allow_stack_execution` disabled, `code_signature_present` enabled, `exposed: 0`) and `web/build/client` (`exposed: 0`, `22` scanned text members).
 
 ---
 
@@ -100,7 +115,7 @@ mobile/
 ├── ios/               SwiftPM + SwiftUI native iOS app consuming NovaCore
 └── android/           Gradle + Jetpack Compose native Android app consuming uniffi.nova_core
 docker/                Multi-stage Bun + Rust Dockerfile & nginx reverse proxy config
-tools/                 smoke.sh, 2-peer WebRTC e2e.mjs, bench.sh
+tools/                 smoke.sh, 2-peer WebRTC + live E2EE e2e.mjs, bench.sh
 scripts/               new-branch.sh, check-branch.sh, check-commit-msg.sh, build-web.sh
 .githooks/             commit-msg, pre-commit, pre-push (NVA-NNN/* enforcement)
 rust/                  Whole-app port map, ADRs, glossary, research, app-cases, handoff, cutover.sh
@@ -166,8 +181,8 @@ cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 (cd web && bun run typecheck && bun run build)
-BASE=http://127.0.0.1:3912 ./tools/smoke.sh
-BASE=http://127.0.0.1:3912 node tools/e2e.mjs
+BASE=http://127.0.0.1:3914 ./tools/smoke.sh
+BASE=http://127.0.0.1:3913 node tools/e2e.mjs
 ./tools/bench.sh ../jitsi-meet
 ```
 

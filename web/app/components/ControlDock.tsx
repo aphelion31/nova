@@ -177,11 +177,9 @@ export function ControlDock({
           {recording ? <Square className="h-3.5 w-3.5 fill-current" /> : <Circle className="h-4 w-4" />}
         </DockBtn>
 
-        {isModerator ? (
-          <DockBtn active={false} label="Security & E2EE" onClick={onOpenSecurity}>
-            <Shield className="h-4 w-4" />
-          </DockBtn>
-        ) : null}
+        <DockBtn active={false} label="Security & E2EE" onClick={onOpenSecurity}>
+          <Shield className="h-4 w-4" />
+        </DockBtn>
 
         <DockBtn active={false} label="Invite & Embed" onClick={onOpenInvite}>
           <Share2 className="h-4 w-4" />

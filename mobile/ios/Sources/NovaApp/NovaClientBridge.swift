@@ -59,6 +59,7 @@ public final class NovaClientBridge: ObservableObject {
     private var core: NovaClientCore
     private var wsTask: URLSessionWebSocketTask?
     private var timer: Timer?
+    private var initialOfferSent = false
     private let rtcAdapter: NovaWebRtcAdapter?
 
     public init(room: String = "standup", rtcAdapter: NovaWebRtcAdapter? = nil) {
@@ -102,6 +103,7 @@ public final class NovaClientBridge: ObservableObject {
             let parsed = try parseNovaMeetingUrl(rawUrl: meetingUrl)
             core = NovaClientCore(room: parsed.room)
             snapshot = core.snapshot()
+            initialOfferSent = false
             self.displayName = displayName
             self.audioOnly = audioOnlyMode
             if audioOnlyMode { self.videoMuted = true }
@@ -269,6 +271,7 @@ public final class NovaClientBridge: ObservableObject {
         wsTask?.cancel(with: .goingAway, reason: nil)
         wsTask = nil
         rtcAdapter?.stop()
+        initialOfferSent = false
         connected = false
         carMode = false
         callSeconds = 0
@@ -327,15 +330,31 @@ public final class NovaClientBridge: ObservableObject {
                 Task { @MainActor in
                     do {
                         if let raw = text.data(using: .utf8),
-                           let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
-                           (obj["type"] as? String) == "reaction",
-                           let emoji = obj["emoji"] as? String,
-                           let senderName = obj["display_name"] as? String {
-                            let item = MobileReaction(emoji: emoji, senderName: senderName)
-                            self.reactions.append(item)
-                            Task { @MainActor in
-                                try? await Task.sleep(nanoseconds: 2_400_000_000)
-                                self.reactions.removeAll { $0.id == item.id }
+                           let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any] {
+                            let msgType = obj["type"] as? String
+                            if msgType == "reaction",
+                               let emoji = obj["emoji"] as? String,
+                               let senderName = obj["display_name"] as? String {
+                                let item = MobileReaction(emoji: emoji, senderName: senderName)
+                                self.reactions.append(item)
+                                Task { @MainActor in
+                                    try? await Task.sleep(nanoseconds: 2_400_000_000)
+                                    self.reactions.removeAll { $0.id == item.id }
+                                }
+                            } else if msgType == "moderated", let action = obj["action"] as? String {
+                                switch action {
+                                case "mute_audio":
+                                    self.audioMuted = true
+                                    self.rtcAdapter?.setAudioMuted(true)
+                                case "mute_video":
+                                    self.videoMuted = true
+                                    self.rtcAdapter?.setVideoMuted(true)
+                                case "kick":
+                                    self.leave()
+                                    return
+                                default:
+                                    break
+                                }
                             }
                         }
 
@@ -355,7 +374,8 @@ public final class NovaClientBridge: ObservableObject {
                                 }
                             }
                         }
-                        if self.connected, self.rtcAdapter != nil, next.sdpAnswer == nil {
+                        if self.connected, self.rtcAdapter != nil, !self.initialOfferSent {
+                            self.initialOfferSent = true
                             self.rtcAdapter?.createInitialOffer(iceUrls: []) { offerSdp in
                                 if let msg = try? self.core.buildRtcOfferPayload(sdp: offerSdp) {
                                     self.sendText(msg)
