@@ -1,6 +1,6 @@
 {
   "target": "nova",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "recorded_against": "target/release/nova",
   "cases": [
     {
@@ -39,6 +39,13 @@
       "expected_status": 200,
       "expected_content_type": "application/javascript",
       "contains": ["JitsiMeetExternalAPI", "NovaMeetExternalAPI", "executeCommand"]
+    },
+    {
+      "name": "api_config",
+      "method": "GET",
+      "path": "/api/config",
+      "expected_status": 200,
+      "expected_keys": ["service", "version", "sfu", "features"]
     }
   ]
 }

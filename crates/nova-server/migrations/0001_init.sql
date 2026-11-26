@@ -52,3 +52,25 @@ CREATE TABLE IF NOT EXISTS room_sessions (
     ended_at INTEGER,
     peak_participants INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS room_files (
+    id TEXT PRIMARY KEY NOT NULL,
+    room_name TEXT NOT NULL,
+    sender_name TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    content BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_room_files_room_created
+    ON room_files (room_name, created_at);
+
+CREATE TABLE IF NOT EXISTS room_feedback (
+    id TEXT PRIMARY KEY NOT NULL,
+    room_name TEXT NOT NULL,
+    rating INTEGER NOT NULL,
+    comment TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL
+);

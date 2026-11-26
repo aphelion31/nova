@@ -551,6 +551,22 @@ fileprivate struct FfiConverterFloat: FfiConverterPrimitive {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterDouble: FfiConverterPrimitive {
+    typealias FfiType = Double
+    typealias SwiftType = Double
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Double {
+        return try lift(readDouble(&buf))
+    }
+
+    public static func write(_ value: Double, into buf: inout [UInt8]) {
+        writeDouble(&buf, lower(value))
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterBool : FfiConverter {
     typealias FfiType = Int8
     typealias SwiftType = Bool
@@ -634,6 +650,8 @@ public protocol NovaClientCoreProtocol: AnyObject, Sendable {
     
     func buildChatPayload(body: String, recipientId: String?) throws  -> String
     
+    func buildEndConferencePayload() throws  -> String
+    
     func buildJoinPayload(displayName: String, password: String?, token: String?, audioMuted: Bool, videoMuted: Bool) throws  -> String
     
     func buildLobbyDecisionPayload(peerId: String, admit: Bool) throws  -> String
@@ -641,6 +659,8 @@ public protocol NovaClientCoreProtocol: AnyObject, Sendable {
     func buildMediaStatePayload(audioMuted: Bool, videoMuted: Bool, screenSharing: Bool, audioLevel: Float) throws  -> String
     
     func buildModeratePayload(targetId: String, action: String) throws  -> String
+    
+    func buildMuteEveryonePayload(includeVideo: Bool) throws  -> String
     
     func buildPollCreatePayload(question: String, options: [String]) throws  -> String
     
@@ -655,6 +675,10 @@ public protocol NovaClientCoreProtocol: AnyObject, Sendable {
     func buildRtcOfferPayload(sdp: String) throws  -> String
     
     func buildRtcRenegotiateAnswerPayload(sdp: String) throws  -> String
+    
+    func buildSharedVideoPayload(url: String?, playing: Bool, timeSecs: Double) throws  -> String
+    
+    func buildSubtitlePayload(text: String, isFinal: Bool) throws  -> String
     
     func deriveE2eeKeyB64(passphrase: String, generation: UInt32) throws  -> String
     
@@ -769,6 +793,15 @@ open func buildChatPayload(body: String, recipientId: String?)throws  -> String 
 })
 }
     
+open func buildEndConferencePayload()throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeNovaCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_nova_core_fn_method_novaclientcore_build_end_conference_payload(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
 open func buildJoinPayload(displayName: String, password: String?, token: String?, audioMuted: Bool, videoMuted: Bool)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeNovaCoreError_lift) {
         uniffiCallStatus in
@@ -814,6 +847,16 @@ open func buildModeratePayload(targetId: String, action: String)throws  -> Strin
             self.uniffiCloneHandle(),
         FfiConverterString.lower(targetId),
         FfiConverterString.lower(action),uniffiCallStatus
+    )
+})
+}
+    
+open func buildMuteEveryonePayload(includeVideo: Bool)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeNovaCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_nova_core_fn_method_novaclientcore_build_mute_everyone_payload(
+            self.uniffiCloneHandle(),
+        FfiConverterBool.lower(includeVideo),uniffiCallStatus
     )
 })
 }
@@ -891,6 +934,29 @@ open func buildRtcRenegotiateAnswerPayload(sdp: String)throws  -> String  {
     uniffi_nova_core_fn_method_novaclientcore_build_rtc_renegotiate_answer_payload(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(sdp),uniffiCallStatus
+    )
+})
+}
+    
+open func buildSharedVideoPayload(url: String?, playing: Bool, timeSecs: Double)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeNovaCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_nova_core_fn_method_novaclientcore_build_shared_video_payload(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(url),
+        FfiConverterBool.lower(playing),
+        FfiConverterDouble.lower(timeSecs),uniffiCallStatus
+    )
+})
+}
+    
+open func buildSubtitlePayload(text: String, isFinal: Bool)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeNovaCoreError_lift) {
+        uniffiCallStatus in
+    uniffi_nova_core_fn_method_novaclientcore_build_subtitle_payload(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(text),
+        FfiConverterBool.lower(isFinal),uniffiCallStatus
     )
 })
 }
@@ -2054,6 +2120,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_nova_core_checksum_method_novaclientcore_build_chat_payload() != 8440) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_nova_core_checksum_method_novaclientcore_build_end_conference_payload() != 20576) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_nova_core_checksum_method_novaclientcore_build_join_payload() != 10872) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -2064,6 +2133,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_nova_core_checksum_method_novaclientcore_build_moderate_payload() != 24135) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_nova_core_checksum_method_novaclientcore_build_mute_everyone_payload() != 29349) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_nova_core_checksum_method_novaclientcore_build_poll_create_payload() != 53976) {
@@ -2085,6 +2157,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_nova_core_checksum_method_novaclientcore_build_rtc_renegotiate_answer_payload() != 46038) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_nova_core_checksum_method_novaclientcore_build_shared_video_payload() != 3990) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_nova_core_checksum_method_novaclientcore_build_subtitle_payload() != 16368) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_nova_core_checksum_method_novaclientcore_derive_e2ee_key_b64() != 20054) {

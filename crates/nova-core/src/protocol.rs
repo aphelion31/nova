@@ -53,6 +53,12 @@ pub struct ChatMessage {
     pub recipient_id: Option<String>,
     pub body: String,
     pub created_at: i64,
+    #[serde(default)]
+    pub reply_to_id: Option<String>,
+    #[serde(default)]
+    pub reply_to_sender: Option<String>,
+    #[serde(default)]
+    pub reply_to_body: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -99,6 +105,49 @@ pub struct RoomSecurityState {
     pub e2ee_enabled: bool,
     pub has_password: bool,
     pub subject: String,
+    #[serde(default)]
+    pub start_audio_muted: bool,
+    #[serde(default)]
+    pub start_video_muted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SharedVideoState {
+    pub url: String,
+    pub owner_id: String,
+    pub owner_name: String,
+    pub playing: bool,
+    pub time_secs: f64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SubtitleEntry {
+    pub id: String,
+    pub peer_id: String,
+    pub display_name: String,
+    pub text: String,
+    pub is_final: bool,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SharedFileMeta {
+    pub id: String,
+    pub room_name: String,
+    pub sender_name: String,
+    pub filename: String,
+    pub mime_type: String,
+    pub size_bytes: u64,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FollowMeState {
+    pub enabled: bool,
+    pub leader_id: Option<String>,
+    pub pinned_peer_id: Option<String>,
+    pub tile_view: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -144,6 +193,8 @@ pub enum ClientMessage {
         body: String,
         #[serde(default)]
         recipient_id: Option<String>,
+        #[serde(default)]
+        reply_to_id: Option<String>,
     },
     Reaction {
         emoji: String,
@@ -194,6 +245,43 @@ pub enum ClientMessage {
     SetDisplayName {
         display_name: String,
     },
+    SetProfile {
+        #[serde(default)]
+        display_name: Option<String>,
+        #[serde(default)]
+        email: Option<String>,
+        #[serde(default)]
+        avatar_url: Option<String>,
+    },
+    Subtitle {
+        text: String,
+        #[serde(default)]
+        is_final: bool,
+    },
+    SharedVideo {
+        #[serde(default)]
+        url: Option<String>,
+        #[serde(default)]
+        playing: bool,
+        #[serde(default)]
+        time_secs: f64,
+    },
+    AvModeration {
+        start_audio_muted: bool,
+        start_video_muted: bool,
+    },
+    FollowMe {
+        enabled: bool,
+        #[serde(default)]
+        pinned_peer_id: Option<String>,
+        #[serde(default)]
+        tile_view: bool,
+    },
+    MuteEveryone {
+        #[serde(default)]
+        include_video: bool,
+    },
+    EndConference,
     Ping {
         ts: i64,
     },
@@ -201,6 +289,10 @@ pub enum ClientMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Joined snapshot carries full room state once per connect; keep flat wire JSON"
+)]
 pub enum ServerMessage {
     Joined {
         self_id: String,
@@ -214,6 +306,12 @@ pub enum ServerMessage {
         strokes: Vec<WhiteboardStroke>,
         lobby: Vec<LobbyEntry>,
         security: RoomSecurityState,
+        #[serde(default)]
+        shared_video: Option<SharedVideoState>,
+        #[serde(default)]
+        follow_me: Option<FollowMeState>,
+        #[serde(default)]
+        files: Vec<SharedFileMeta>,
     },
     LobbyWaiting {
         room: String,
@@ -265,6 +363,21 @@ pub enum ServerMessage {
     },
     RoomSecurityUpdated {
         security: RoomSecurityState,
+    },
+    Subtitle {
+        entry: SubtitleEntry,
+    },
+    SharedVideoUpdated {
+        state: Option<SharedVideoState>,
+    },
+    FollowMeUpdated {
+        state: FollowMeState,
+    },
+    FileShared {
+        file: SharedFileMeta,
+    },
+    ConferenceEnded {
+        by_name: String,
     },
     Moderated {
         action: ModerationAction,
@@ -319,5 +432,36 @@ mod tests {
             ServerMessage::Error { code, .. } => assert_eq!(code, "invalid_password"),
             _ => panic!("unexpected variant"),
         }
+
+        let follow = ClientMessage::FollowMe {
+            enabled: true,
+            pinned_peer_id: Some("p2".into()),
+            tile_view: false,
+        };
+        let fraw = serde_json::to_string(&follow).expect("serialize follow_me");
+        assert!(fraw.contains(r#""type":"follow_me""#));
+        let fback: ClientMessage = serde_json::from_str(&fraw).expect("deserialize follow_me");
+        assert!(matches!(
+            fback,
+            ClientMessage::FollowMe {
+                enabled: true,
+                tile_view: false,
+                ..
+            }
+        ));
+
+        let sv = ServerMessage::SharedVideoUpdated {
+            state: Some(SharedVideoState {
+                url: "https://example.com/video.mp4".into(),
+                owner_id: "p1".into(),
+                owner_name: "Alice".into(),
+                playing: true,
+                time_secs: 12.5,
+                updated_at: 1000,
+            }),
+        };
+        let sraw = serde_json::to_string(&sv).expect("serialize shared_video_updated");
+        let sback: ServerMessage = serde_json::from_str(&sraw).expect("deserialize shared_video_updated");
+        assert!(matches!(sback, ServerMessage::SharedVideoUpdated { state: Some(_) }));
     }
 }

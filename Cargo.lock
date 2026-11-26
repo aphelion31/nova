@@ -1908,7 +1908,7 @@ dependencies = [
 
 [[package]]
 name = "nova-core"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "aes-gcm",
  "base64",
@@ -1925,7 +1925,7 @@ dependencies = [
 
 [[package]]
 name = "nova-server"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "argon2",

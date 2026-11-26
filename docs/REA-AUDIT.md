@@ -1,12 +1,12 @@
-# REA Shipped-Artifact Inspection & Release Audit (`nova` v1.0.0)
+# REA Shipped-Artifact Inspection & Release Audit (`nova` v1.1.0)
 
 Recorded using REA MCP tools against the compiled `nova` release binary (`target/release/nova`) and built React Router 8 PWA bundle (`web/build/client`).
 
 ## 1. Release Binary Hardening (`target/release/nova`)
 
-- **Evidence ID**: `ev_ac14ca1e879f13dc330f8a8acfcd6571e9deda2c809afa6eb6c2d82c588ad167`
-- **Format / Arch**: Mach-O `arm64` (64-bit, `11,990,832` bytes / `11.44 MiB`)
-- **SHA-256**: `7beaa33c3b866bbb68693858674a0665a280cd97e69d06148d3150b6259545c4`
+- **Evidence ID**: `ev_b3ec80f9a9da0547f6e363b1903cdd99a7157161f8e35930139bd75133b636ba`
+- **Format / Arch**: Mach-O `arm64` (64-bit, `12,107,072` bytes / `11.55 MiB`)
+- **SHA-256**: `a46c87604f74c7fb4085f4a8701d314f5912b15de1e030e043d54333d681c374`
 
 | Property | State | Basis |
 | --- | --- | --- |
@@ -22,14 +22,14 @@ Recorded using REA MCP tools against the compiled `nova` release binary (`target
 ## 2. Release Exposure Audits
 
 ### Rust Binary (`target/release/nova`)
-- **Evidence ID**: `ev_3aae1e9fb9feb58e4030b822193f8503b209736634c7256f6ec51cc9b264b01d`
+- **Evidence ID**: `ev_fb82425e18d9df07f720f9c785f075350fbee7ec0501a675948d806ec10e826a`
 - **Result**: `exposed: 0`, `no_exposure_observed_in_assessed_checks: true` (`not_observed: 4`, `not_applicable: 6`, `unknown: 2`, `not_assessed: 3`) — zero `.dSYM`, `.pdb`, debug companions, or embedded JS source maps.
 
 ### React Router 8 PWA Bundle (`web/build/client`)
-- **Evidence ID**: `ev_bd5dddf91bd4fc57140f6077e39e2fca87acf4f0f166e588beea2bc74ad0b9c0`
-- **SHA-256**: `3c36b2736bba661f4c99a1bc1d8350b00b86c046f5dd9dd1797f5baae0d15f12`
+- **Evidence ID**: `ev_67a977369938f073861813c8d32a1e936ff868db1ba7f9b6bf86ef06338af8ba`
+- **SHA-256**: `78174774ec54e02d6776a6451ddd2b20644e7d73030cbbfac4dc96d9bdbb1f97`
 - **Result**: `exposed: 0`, `no_exposure_observed_in_assessed_checks: true` (`22` scanned text members, `0` credential markers exposed).
 
 ### Embedded Crate Metadata Probe (`inspect_rust_binary`)
-- **Evidence ID**: `ev_fe0a3fc1bd790642a37d9090fc1c5e809e2a8c6117c6c1a8b14141a7b579e839`
-- **Observation**: Stripped release binary (`11,990,832` bytes), zero `.dep-v0` (`cargo-auditable`) dependency list shipped inside the binary; inferred `rustc` commit `88d9e12ae178fab0fb5cc050a94da85685d449ea` at offset `8570040`.
+- **Evidence ID**: `ev_d6f3602ce22acbba44b8ed69f7511316af9d7d85ef2aa7dda2dae8ca09803223` (summary view `ev_d23a30ba86050b5b4512314f1a4a2e0ad15f7befa7d6b62cf20b656005c55b88`)
+- **Observation**: Stripped release binary (`12,107,072` bytes), zero `.dep-v0` (`cargo-auditable`) dependency list shipped inside the binary; inferred `rustc` commit hash count `1`.

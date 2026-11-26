@@ -59,15 +59,16 @@ async fn serve_interface_config_js() -> impl IntoResponse {
     let body = r##"var interfaceConfig = {
   APP_NAME: "Nova Meet",
   PROVIDER_NAME: "Nova",
-  DEFAULT_BACKGROUND: "#0b0f17",
+  DEFAULT_BACKGROUND: "#040404",
   DISABLE_JOIN_LEAVE_NOTIFICATIONS: false,
   FILM_STRIP_MAX_HEIGHT: 120,
   GENERATE_ROOMNAMES_ON_WELCOME_PAGE: true,
   HIDE_INVITE_MORE_HEADER: false,
   TOOLBAR_BUTTONS: [
-    "microphone", "camera", "desktop", "chat", "raisehand",
-    "participants-pane", "tileview", "polls", "whiteboard",
-    "breakout-rooms", "security", "recording", "hangup"
+    "microphone", "camera", "desktop", "chat", "raisehand", "reactions",
+    "participants-pane", "tileview", "polls", "closedcaptions", "filesharing",
+    "sharedvideo", "whiteboard", "breakout-rooms", "security", "recording",
+    "select-background", "settings", "shortcuts", "videoquality", "fullscreen", "hangup"
   ]
 };
 "##;
@@ -90,6 +91,13 @@ async fn serve_external_api_js() -> impl IntoResponse {
     toggleTileView: "toggle-tile-view",
     toggleRaiseHand: "toggle-raise-hand",
     toggleWhiteboard: "toggle-whiteboard",
+    toggleSubtitles: "toggle-subtitles",
+    startShareVideo: "start-share-video",
+    stopShareVideo: "stop-share-video",
+    endConference: "end-conference",
+    setVideoQuality: "set-video-quality",
+    toggleParticipantsPane: "toggle-participants-pane",
+    toggleVirtualBackgroundDialog: "toggle-virtual-background",
     hangup: "video-hangup",
     displayName: "display-name",
     subject: "subject",

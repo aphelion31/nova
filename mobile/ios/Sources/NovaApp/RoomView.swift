@@ -98,12 +98,12 @@ struct RoomView: View {
                                     }
                                 }
                                 .frame(maxWidth: .infinity, minHeight: bridge.tileView ? 132 : 200)
-                                .background(Color.gray.opacity(0.14))
+                                .background(Color(red: 0x29 / 255.0, green: 0x29 / 255.0, blue: 0x29 / 255.0))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .stroke(isSpeaker ? Color.green : Color.clear, lineWidth: 2)
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(isSpeaker ? Color(red: 0x24 / 255.0, green: 0x6F / 255.0, blue: 0xE5 / 255.0) : Color.clear, lineWidth: 2)
                                 )
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                         }
                         .padding(.horizontal)
