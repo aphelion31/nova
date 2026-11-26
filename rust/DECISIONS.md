@@ -33,7 +33,7 @@ Consequences: Business logic is written and tested once in Rust; native mobile p
 ## ADR-006: Drop-in `/external_api.js` compatibility & intentional scope exclusions
 Status: accepted (2026-11-26)
 Context: Embedders expect `new JitsiMeetExternalAPI(domain, options)`, `config.js`, and `interface_config.js`. Legacy Prosody XMPP XML, Jigasi SIP, Jibri Chrome recording, and SaaS telemetry add heavy non-core surface.
-Decision: Provide drop-in `/external_api.js`, `/config.js`, and `/interface_config.js` alongside REST/WS APIs; mark XMPP/BOSH wire protocol, Jigasi, Jibri, and SaaS integrations out of scope for v0.1.0.
+Decision: Provide drop-in `/external_api.js`, `/config.js`, and `/interface_config.js` alongside REST/WS APIs; mark XMPP/BOSH wire protocol, Jigasi, Jibri, and SaaS integrations out of scope for v1.0.0.
 Consequences: Standard Jitsi iframe embedders work directly against Nova without Java/Lua XMPP servers.
 
 ## ADR-007: Verification gates & release audit bar
