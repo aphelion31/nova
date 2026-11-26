@@ -1,12 +1,12 @@
-# REA Shipped-Artifact Inspection & Release Audit (`nova` v0.1.0)
+# REA Shipped-Artifact Inspection & Release Audit (`nova` v1.0.0)
 
 Recorded using REA MCP tools against the compiled `nova` release binary (`target/release/nova`) and built React Router 8 PWA bundle (`web/build/client`).
 
 ## 1. Release Binary Hardening (`target/release/nova`)
 
-- **Evidence ID**: `ev_acf8782e55536456351a99865da4d9669ab0ccdb8f814ceffe45769def23e288`
+- **Evidence ID**: `ev_ac14ca1e879f13dc330f8a8acfcd6571e9deda2c809afa6eb6c2d82c588ad167`
 - **Format / Arch**: Mach-O `arm64` (64-bit, `11,990,832` bytes / `11.44 MiB`)
-- **SHA-256**: `a1b65972f7a6709d65020e1f3f06c3fc2923f91bf0eb083e622ecb68e3f3405e`
+- **SHA-256**: `7beaa33c3b866bbb68693858674a0665a280cd97e69d06148d3150b6259545c4`
 
 | Property | State | Basis |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ Recorded using REA MCP tools against the compiled `nova` release binary (`target
 ## 2. Release Exposure Audits
 
 ### Rust Binary (`target/release/nova`)
-- **Evidence ID**: `ev_422a71e0ddb4a5127abc44e7ddbfb2a46ae89acebb4bac8b3b9b7aa700e67c65`
+- **Evidence ID**: `ev_3aae1e9fb9feb58e4030b822193f8503b209736634c7256f6ec51cc9b264b01d`
 - **Result**: `exposed: 0`, `no_exposure_observed_in_assessed_checks: true` (`not_observed: 4`, `not_applicable: 6`, `unknown: 2`, `not_assessed: 3`) — zero `.dSYM`, `.pdb`, debug companions, or embedded JS source maps.
 
 ### React Router 8 PWA Bundle (`web/build/client`)
@@ -31,5 +31,5 @@ Recorded using REA MCP tools against the compiled `nova` release binary (`target
 - **Result**: `exposed: 0`, `no_exposure_observed_in_assessed_checks: true` (`22` scanned text members, `0` credential markers exposed).
 
 ### Embedded Crate Metadata Probe (`inspect_rust_binary`)
-- **Evidence ID**: `ev_6952fc0b7b0936454d68def55e3806a65eb834629c7beaca26d93142642fc60b`
+- **Evidence ID**: `ev_fe0a3fc1bd790642a37d9090fc1c5e809e2a8c6117c6c1a8b14141a7b579e839`
 - **Observation**: Stripped release binary (`11,990,832` bytes), zero `.dep-v0` (`cargo-auditable`) dependency list shipped inside the binary; inferred `rustc` commit `88d9e12ae178fab0fb5cc050a94da85685d449ea` at offset `8570040`.
