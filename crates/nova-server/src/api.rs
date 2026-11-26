@@ -4,15 +4,17 @@ use crate::rooms::RoomRegistry;
 use crate::sfu::SfuHandle;
 use axum::{
     Json, Router,
-    extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    extract::{DefaultBodyLimit, Path, State},
+    http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
     routing::{get, post},
 };
-use nova_core::protocol::IceServerConfig;
+use base64::Engine as _;
+use nova_core::protocol::{IceServerConfig, SharedFileMeta};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use std::sync::Arc;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct ApiState {
@@ -81,6 +83,14 @@ pub fn routes(
         .route("/api/rooms/{name}/messages", get(get_room_messages))
         .route("/api/rooms/{name}/polls", get(get_room_polls))
         .route("/api/rooms/{name}/stats", get(get_room_stats))
+        .route(
+            "/api/rooms/{name}/files",
+            get(list_room_files)
+                .post(upload_room_file)
+                .layer(DefaultBodyLimit::max(8 * 1024 * 1024)),
+        )
+        .route("/api/rooms/{name}/files/{id}", get(download_room_file))
+        .route("/api/rooms/{name}/feedback", post(submit_room_feedback))
         .with_state(st)
 }
 
@@ -98,6 +108,13 @@ async fn get_config(State(st): State<ApiState>) -> impl IntoResponse {
             "whiteboard": true,
             "breakoutRooms": true,
             "screenShare": true,
+            "subtitles": true,
+            "sharedVideo": true,
+            "fileSharing": true,
+            "avModeration": true,
+            "followMe": true,
+            "virtualBackground": true,
+            "feedback": true,
             "externalApi": true,
             "nativeMobile": ["ios-swiftui-uniffi", "android-compose-uniffi"]
         }
@@ -358,4 +375,200 @@ async fn get_room_stats(State(st): State<ApiState>, Path(name): Path<String>) ->
         "speaker_stats": participants
     }))
     .into_response()
+}
+
+#[derive(Debug, Deserialize)]
+struct UploadFileReq {
+    filename: String,
+    #[serde(default)]
+    mime_type: Option<String>,
+    data_base64: String,
+    #[serde(default)]
+    sender_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FeedbackReq {
+    rating: u8,
+    #[serde(default)]
+    comment: Option<String>,
+}
+
+fn sanitize_filename(raw: &str) -> String {
+    let base = raw.rsplit(['/', '\\']).next().unwrap_or("file").trim();
+    let cleaned: String = base
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .trim_start_matches('.')
+        .chars()
+        .take(120)
+        .collect();
+    if cleaned.is_empty() {
+        "attachment.bin".to_string()
+    } else {
+        cleaned
+    }
+}
+
+fn sanitize_mime(raw: Option<&str>) -> String {
+    match raw.unwrap_or("").trim().to_ascii_lowercase().as_str() {
+        "application/pdf" | "text/plain" | "text/csv" | "application/json" | "image/png" | "image/jpeg"
+        | "image/webp" | "image/gif" => raw.unwrap_or("application/octet-stream").trim().to_string(),
+        _ => "application/octet-stream".to_string(),
+    }
+}
+
+async fn list_room_files(State(st): State<ApiState>, Path(name): Path<String>) -> impl IntoResponse {
+    if !nova_core::validate_room_slug(name.clone()) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "invalid room name" })),
+        )
+            .into_response();
+    }
+    let files = db::list_room_files(&st.db, &name, 50).await.unwrap_or_default();
+    Json(serde_json::json!({ "files": files })).into_response()
+}
+
+async fn upload_room_file(
+    State(st): State<ApiState>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+    Json(req): Json<UploadFileReq>,
+) -> impl IntoResponse {
+    if !nova_core::validate_room_slug(name.clone()) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "invalid room name" })),
+        )
+            .into_response();
+    }
+    let b64_payload = req
+        .data_base64
+        .split_once(";base64,")
+        .map(|(_, rest)| rest)
+        .unwrap_or(req.data_base64.as_str())
+        .trim();
+    let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(b64_payload) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "invalid base64 payload" })),
+        )
+            .into_response();
+    };
+    if bytes.is_empty() || bytes.len() > 5 * 1024 * 1024 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "file must be between 1 byte and 5 MiB" })),
+        )
+            .into_response();
+    }
+
+    let session_user = auth::current_session_user(&st.db, &st.auth, &headers).await;
+    let sender_name = req
+        .sender_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(ToString::to_string)
+        .or_else(|| session_user.map(|u| u.display_name))
+        .unwrap_or_else(|| "Participant".to_string());
+
+    let meta = SharedFileMeta {
+        id: Uuid::new_v4().to_string(),
+        room_name: name.clone(),
+        sender_name: sender_name.chars().take(64).collect(),
+        filename: sanitize_filename(&req.filename),
+        mime_type: sanitize_mime(req.mime_type.as_deref()),
+        size_bytes: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+        created_at: chrono::Utc::now().timestamp(),
+    };
+
+    if let Err(e) = db::insert_room_file(&st.db, &meta, &bytes).await {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+
+    st.registry.broadcast_file_shared(&name, meta.clone()).await;
+    (StatusCode::CREATED, Json(serde_json::json!({ "file": meta }))).into_response()
+}
+
+async fn download_room_file(State(st): State<ApiState>, Path((name, id)): Path<(String, String)>) -> impl IntoResponse {
+    if !nova_core::validate_room_slug(name.clone()) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "invalid room name" })),
+        )
+            .into_response();
+    }
+    match db::get_room_file(&st.db, &name, &id).await {
+        Ok(Some((meta, bytes))) => {
+            let safe_name = sanitize_filename(&meta.filename);
+            let safe_mime = sanitize_mime(Some(&meta.mime_type));
+            (
+                StatusCode::OK,
+                [
+                    (header::CONTENT_TYPE, safe_mime),
+                    (
+                        header::CONTENT_DISPOSITION,
+                        format!("attachment; filename=\"{safe_name}\""),
+                    ),
+                    (header::X_CONTENT_TYPE_OPTIONS, "nosniff".to_string()),
+                ],
+                bytes,
+            )
+                .into_response()
+        }
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "file not found" })),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+async fn submit_room_feedback(
+    State(st): State<ApiState>,
+    Path(name): Path<String>,
+    Json(req): Json<FeedbackReq>,
+) -> impl IntoResponse {
+    if !nova_core::validate_room_slug(name.clone()) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "invalid room name" })),
+        )
+            .into_response();
+    }
+    if !(1..=5).contains(&req.rating) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "rating must be 1..=5" })),
+        )
+            .into_response();
+    }
+    let clean_comment: String = req.comment.unwrap_or_default().trim().chars().take(1000).collect();
+    let id = Uuid::new_v4().to_string();
+    match db::insert_room_feedback(&st.db, &id, &name, req.rating, &clean_comment).await {
+        Ok(()) => (StatusCode::CREATED, Json(serde_json::json!({ "ok": true, "id": id }))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
 }

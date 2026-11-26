@@ -30,6 +30,16 @@ export interface RoomStats {
   }>;
 }
 
+export interface SharedFileMeta {
+  id: string;
+  room_name: string;
+  sender_name: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: number;
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     credentials: "include",
@@ -72,4 +82,21 @@ export const api = {
       body: JSON.stringify({ display_name, moderator }),
     }),
   getRoomStats: (name: string) => req<RoomStats>(`/api/rooms/${encodeURIComponent(name)}/stats`),
+  listRoomFiles: (name: string) =>
+    req<{ files: SharedFileMeta[] }>(`/api/rooms/${encodeURIComponent(name)}/files`),
+  uploadRoomFile: (
+    name: string,
+    payload: { filename: string; mime_type: string; data_base64: string; sender_name: string },
+  ) =>
+    req<{ file: SharedFileMeta }>(`/api/rooms/${encodeURIComponent(name)}/files`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  roomFileDownloadUrl: (roomName: string, fileId: string) =>
+    `/api/rooms/${encodeURIComponent(roomName)}/files/${encodeURIComponent(fileId)}`,
+  submitFeedback: (name: string, rating: number, comment: string) =>
+    req<{ ok: boolean; id: string }>(`/api/rooms/${encodeURIComponent(name)}/feedback`, {
+      method: "POST",
+      body: JSON.stringify({ rating, comment }),
+    }),
 };

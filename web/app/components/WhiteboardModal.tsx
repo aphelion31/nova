@@ -10,7 +10,7 @@ interface WhiteboardModalProps {
   onClose: () => void;
 }
 
-const COLORS = ["#38bdf8", "#f43f5e", "#22c55e", "#facc15", "#ffffff"];
+const COLORS = ["#4687ED", "#F24D5F", "#1EC26A", "#F8AE1A", "#FFFFFF"];
 
 export function WhiteboardModal({ strokes, selfId, onAddStroke, onClear, onClose }: WhiteboardModalProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -24,7 +24,7 @@ export function WhiteboardModal({ strokes, selfId, onAddStroke, onClear, onClose
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.fillStyle = "#0b0f17";
+    ctx.fillStyle = "#040404";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     for (const s of strokes) {
@@ -97,10 +97,10 @@ export function WhiteboardModal({ strokes, selfId, onAddStroke, onClear, onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-      <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#121826] shadow-2xl">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+      <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-[8px] border border-[#3D3D3D] bg-[#141414] shadow-2xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#292929] px-4 py-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-white">Collaborative Whiteboard</h2>
+            <h2 className="text-sm font-semibold text-white">Whiteboard</h2>
             <div className="ml-3 flex items-center gap-1.5">
               {COLORS.map((c) => (
                 <button
@@ -108,7 +108,7 @@ export function WhiteboardModal({ strokes, selfId, onAddStroke, onClear, onClose
                   type="button"
                   onClick={() => setColor(c)}
                   aria-label={`Color ${c}`}
-                  className={`h-5 w-5 rounded-full ${color === c ? "ring-2 ring-white ring-offset-2 ring-offset-[#121826]" : ""}`}
+                  className={`h-5 w-5 rounded-full ${color === c ? "ring-2 ring-white ring-offset-2 ring-offset-[#141414]" : ""}`}
                   style={{ backgroundColor: c }}
                 />
               ))}
@@ -120,25 +120,30 @@ export function WhiteboardModal({ strokes, selfId, onAddStroke, onClear, onClose
               value={width}
               onChange={(e) => setWidth(Number(e.target.value))}
               aria-label="Stroke width"
-              className="ml-2 w-20"
+              className="ml-2 w-20 accent-[#246FE5]"
             />
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={downloadPng}
-              className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs text-white hover:bg-white/15"
+              className="inline-flex items-center gap-1 rounded-[6px] bg-[#292929] px-2.5 py-1.5 text-xs font-medium text-white hover:bg-[#3D3D3D]"
             >
               <Download className="h-3.5 w-3.5" /> PNG
             </button>
             <button
               type="button"
               onClick={onClear}
-              className="inline-flex items-center gap-1 rounded-lg bg-rose-600/20 px-2.5 py-1.5 text-xs text-rose-300 hover:bg-rose-600/30"
+              className="inline-flex items-center gap-1 rounded-[6px] bg-[#CB2233]/25 px-2.5 py-1.5 text-xs font-medium text-[#F24D5F] hover:bg-[#CB2233]/40"
             >
               <Trash2 className="h-3.5 w-3.5" /> Clear
             </button>
-            <button type="button" onClick={onClose} aria-label="Close whiteboard" className="rounded-lg p-1 text-slate-300 hover:bg-white/10">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close whiteboard"
+              className="rounded p-1 text-[#A3A3A3] hover:bg-[#292929] hover:text-white"
+            >
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -150,7 +155,7 @@ export function WhiteboardModal({ strokes, selfId, onAddStroke, onClear, onClose
           onPointerDown={handleDown}
           onPointerMove={handleMove}
           onPointerUp={handleUp}
-          className="aspect-video w-full cursor-crosshair touch-none bg-[#0b0f17]"
+          className="aspect-video w-full cursor-crosshair touch-none bg-[#040404]"
         />
       </div>
     </div>

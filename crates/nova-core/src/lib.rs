@@ -359,6 +359,40 @@ impl NovaClientCore {
         serialize_client_msg(&ClientMessage::ChatSend {
             body: body.trim().to_string(),
             recipient_id,
+            reply_to_id: None,
+        })
+    }
+
+    pub fn build_mute_everyone_payload(&self, include_video: bool) -> Result<String, NovaCoreError> {
+        serialize_client_msg(&ClientMessage::MuteEveryone { include_video })
+    }
+
+    pub fn build_end_conference_payload(&self) -> Result<String, NovaCoreError> {
+        serialize_client_msg(&ClientMessage::EndConference)
+    }
+
+    pub fn build_subtitle_payload(&self, text: String, is_final: bool) -> Result<String, NovaCoreError> {
+        if text.trim().is_empty() {
+            return Err(NovaCoreError::InvalidPayload {
+                detail: "subtitle text must not be empty".into(),
+            });
+        }
+        serialize_client_msg(&ClientMessage::Subtitle {
+            text: text.trim().to_string(),
+            is_final,
+        })
+    }
+
+    pub fn build_shared_video_payload(
+        &self,
+        url: Option<String>,
+        playing: bool,
+        time_secs: f64,
+    ) -> Result<String, NovaCoreError> {
+        serialize_client_msg(&ClientMessage::SharedVideo {
+            url,
+            playing,
+            time_secs,
         })
     }
 
@@ -515,7 +549,12 @@ mod tests {
                 e2ee_enabled: false,
                 has_password: false,
                 subject: "Weekly".into(),
+                start_audio_muted: false,
+                start_video_muted: false,
             },
+            shared_video: None,
+            follow_me: None,
+            files: vec![],
         })
         .expect("serialize joined");
         let snap = core.apply_server_json(joined).expect("apply joined");

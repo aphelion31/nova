@@ -8,9 +8,16 @@ export interface ExternalCommandHandlers {
   onToggleVideo?: () => void;
   onToggleShareScreen?: () => void;
   onToggleChat?: () => void;
+  onToggleParticipantsPane?: () => void;
   onToggleTileView?: () => void;
   onToggleRaiseHand?: () => void;
   onToggleWhiteboard?: () => void;
+  onToggleSubtitles?: () => void;
+  onToggleVirtualBackground?: () => void;
+  onStartShareVideo?: (url: string) => void;
+  onStopShareVideo?: () => void;
+  onSetVideoQuality?: (heightOrMode: unknown) => void;
+  onEndConference?: () => void;
   onHangup?: () => void;
   onSendChat?: (body: string) => void;
   onDisplayName?: (name: string) => void;
@@ -37,6 +44,9 @@ export function subscribeExternalCommands(handlers: ExternalCommandHandlers): ()
       case "toggle-chat":
         handlers.onToggleChat?.();
         break;
+      case "toggle-participants-pane":
+        handlers.onToggleParticipantsPane?.();
+        break;
       case "toggle-tile-view":
         handlers.onToggleTileView?.();
         break;
@@ -45,6 +55,24 @@ export function subscribeExternalCommands(handlers: ExternalCommandHandlers): ()
         break;
       case "toggle-whiteboard":
         handlers.onToggleWhiteboard?.();
+        break;
+      case "toggle-subtitles":
+        handlers.onToggleSubtitles?.();
+        break;
+      case "toggle-virtual-background":
+        handlers.onToggleVirtualBackground?.();
+        break;
+      case "start-share-video":
+        if (typeof args[0] === "string") handlers.onStartShareVideo?.(args[0]);
+        break;
+      case "stop-share-video":
+        handlers.onStopShareVideo?.();
+        break;
+      case "set-video-quality":
+        handlers.onSetVideoQuality?.(args[0]);
+        break;
+      case "end-conference":
+        handlers.onEndConference?.();
         break;
       case "video-hangup":
         handlers.onHangup?.();

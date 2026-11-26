@@ -745,6 +745,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_nova_core_checksum_method_novaclientcore_build_chat_payload(
     ): Int
+    external fun uniffi_nova_core_checksum_method_novaclientcore_build_end_conference_payload(
+    ): Int
     external fun uniffi_nova_core_checksum_method_novaclientcore_build_join_payload(
     ): Int
     external fun uniffi_nova_core_checksum_method_novaclientcore_build_lobby_decision_payload(
@@ -752,6 +754,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_nova_core_checksum_method_novaclientcore_build_media_state_payload(
     ): Int
     external fun uniffi_nova_core_checksum_method_novaclientcore_build_moderate_payload(
+    ): Int
+    external fun uniffi_nova_core_checksum_method_novaclientcore_build_mute_everyone_payload(
     ): Int
     external fun uniffi_nova_core_checksum_method_novaclientcore_build_poll_create_payload(
     ): Int
@@ -766,6 +770,10 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_nova_core_checksum_method_novaclientcore_build_rtc_offer_payload(
     ): Int
     external fun uniffi_nova_core_checksum_method_novaclientcore_build_rtc_renegotiate_answer_payload(
+    ): Int
+    external fun uniffi_nova_core_checksum_method_novaclientcore_build_shared_video_payload(
+    ): Int
+    external fun uniffi_nova_core_checksum_method_novaclientcore_build_subtitle_payload(
     ): Int
     external fun uniffi_nova_core_checksum_method_novaclientcore_derive_e2ee_key_b64(
     ): Int
@@ -810,6 +818,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_build_chat_payload(`ptr`: Long,`body`: RustBuffer.ByValue,`recipientId`: RustBuffer.ByValue,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
+    external fun uniffi_nova_core_fn_method_novaclientcore_build_end_conference_payload(`ptr`: Long,uniffi_out_err: Pointer, 
+    ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_build_join_payload(`ptr`: Long,`displayName`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,`token`: RustBuffer.ByValue,`audioMuted`: Byte,`videoMuted`: Byte,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_build_lobby_decision_payload(`ptr`: Long,`peerId`: RustBuffer.ByValue,`admit`: Byte,uniffi_out_err: Pointer, 
@@ -817,6 +827,8 @@ internal object UniffiLib {
     external fun uniffi_nova_core_fn_method_novaclientcore_build_media_state_payload(`ptr`: Long,`audioMuted`: Byte,`videoMuted`: Byte,`screenSharing`: Byte,`audioLevel`: Float,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_build_moderate_payload(`ptr`: Long,`targetId`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,uniffi_out_err: Pointer, 
+    ): RustBuffer.ByValue
+    external fun uniffi_nova_core_fn_method_novaclientcore_build_mute_everyone_payload(`ptr`: Long,`includeVideo`: Byte,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_build_poll_create_payload(`ptr`: Long,`question`: RustBuffer.ByValue,`options`: RustBuffer.ByValue,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
@@ -831,6 +843,10 @@ internal object UniffiLib {
     external fun uniffi_nova_core_fn_method_novaclientcore_build_rtc_offer_payload(`ptr`: Long,`sdp`: RustBuffer.ByValue,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_build_rtc_renegotiate_answer_payload(`ptr`: Long,`sdp`: RustBuffer.ByValue,uniffi_out_err: Pointer, 
+    ): RustBuffer.ByValue
+    external fun uniffi_nova_core_fn_method_novaclientcore_build_shared_video_payload(`ptr`: Long,`url`: RustBuffer.ByValue,`playing`: Byte,`timeSecs`: Double,uniffi_out_err: Pointer, 
+    ): RustBuffer.ByValue
+    external fun uniffi_nova_core_fn_method_novaclientcore_build_subtitle_payload(`ptr`: Long,`text`: RustBuffer.ByValue,`isFinal`: Byte,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_derive_e2ee_key_b64(`ptr`: Long,`passphrase`: RustBuffer.ByValue,`generation`: Int,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
@@ -979,6 +995,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_chat_payload() and 0xFFFF) != 8440) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_end_conference_payload() and 0xFFFF) != 20576) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_join_payload() and 0xFFFF) != 10872) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -989,6 +1008,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_moderate_payload() and 0xFFFF) != 24135) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_mute_everyone_payload() and 0xFFFF) != 29349) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_poll_create_payload() and 0xFFFF) != 53976) {
@@ -1010,6 +1032,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_rtc_renegotiate_answer_payload() and 0xFFFF) != 46038) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_shared_video_payload() and 0xFFFF) != 3990) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_subtitle_payload() and 0xFFFF) != 16368) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_nova_core_checksum_method_novaclientcore_derive_e2ee_key_b64() and 0xFFFF) != 20054) {
@@ -1276,6 +1304,29 @@ public object FfiConverterFloat: FfiConverter<Float, Float> {
 /**
  * @suppress
  */
+public object FfiConverterDouble: FfiConverter<Double, Double> {
+    override fun lift(value: Double): Double {
+        return value
+    }
+
+    override fun read(buf: ByteBuffer): Double {
+        return buf.getDouble()
+    }
+
+    override fun lower(value: Double): Double {
+        return value
+    }
+
+    override fun allocationSize(value: Double) = 8UL
+
+    override fun write(value: Double, buf: ByteBuffer) {
+        buf.putDouble(value)
+    }
+}
+
+/**
+ * @suppress
+ */
 public object FfiConverterBoolean: FfiConverter<Boolean, Byte> {
     override fun lift(value: Byte): Boolean {
         return value.toInt() != 0
@@ -1462,6 +1513,8 @@ public interface NovaClientCoreInterface {
     
     fun `buildChatPayload`(`body`: kotlin.String, `recipientId`: kotlin.String?): kotlin.String
     
+    fun `buildEndConferencePayload`(): kotlin.String
+    
     fun `buildJoinPayload`(`displayName`: kotlin.String, `password`: kotlin.String?, `token`: kotlin.String?, `audioMuted`: kotlin.Boolean, `videoMuted`: kotlin.Boolean): kotlin.String
     
     fun `buildLobbyDecisionPayload`(`peerId`: kotlin.String, `admit`: kotlin.Boolean): kotlin.String
@@ -1469,6 +1522,8 @@ public interface NovaClientCoreInterface {
     fun `buildMediaStatePayload`(`audioMuted`: kotlin.Boolean, `videoMuted`: kotlin.Boolean, `screenSharing`: kotlin.Boolean, `audioLevel`: kotlin.Float): kotlin.String
     
     fun `buildModeratePayload`(`targetId`: kotlin.String, `action`: kotlin.String): kotlin.String
+    
+    fun `buildMuteEveryonePayload`(`includeVideo`: kotlin.Boolean): kotlin.String
     
     fun `buildPollCreatePayload`(`question`: kotlin.String, `options`: List<kotlin.String>): kotlin.String
     
@@ -1483,6 +1538,10 @@ public interface NovaClientCoreInterface {
     fun `buildRtcOfferPayload`(`sdp`: kotlin.String): kotlin.String
     
     fun `buildRtcRenegotiateAnswerPayload`(`sdp`: kotlin.String): kotlin.String
+    
+    fun `buildSharedVideoPayload`(`url`: kotlin.String?, `playing`: kotlin.Boolean, `timeSecs`: kotlin.Double): kotlin.String
+    
+    fun `buildSubtitlePayload`(`text`: kotlin.String, `isFinal`: kotlin.Boolean): kotlin.String
     
     fun `deriveE2eeKeyB64`(`passphrase`: kotlin.String, `generation`: kotlin.UInt): kotlin.String
     
@@ -1673,6 +1732,20 @@ open class NovaClientCore: Disposable, AutoCloseable, NovaClientCoreInterface
     
 
     
+    @Throws(NovaCoreException::class)override fun `buildEndConferencePayload`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(NovaCoreException) { _status ->
+    UniffiLib.uniffi_nova_core_fn_method_novaclientcore_build_end_conference_payload(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
     @Throws(NovaCoreException::class)override fun `buildJoinPayload`(`displayName`: kotlin.String, `password`: kotlin.String?, `token`: kotlin.String?, `audioMuted`: kotlin.Boolean, `videoMuted`: kotlin.Boolean): kotlin.String {
             return FfiConverterString.lift(
     callWithHandle {
@@ -1735,6 +1808,21 @@ open class NovaClientCore: Disposable, AutoCloseable, NovaClientCoreInterface
         
         FfiConverterString.lower(`targetId`),
         FfiConverterString.lower(`action`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(NovaCoreException::class)override fun `buildMuteEveryonePayload`(`includeVideo`: kotlin.Boolean): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(NovaCoreException) { _status ->
+    UniffiLib.uniffi_nova_core_fn_method_novaclientcore_build_mute_everyone_payload(
+        it,
+        
+        FfiConverterBoolean.lower(`includeVideo`),_status)
 }
     }
     )
@@ -1847,6 +1935,39 @@ open class NovaClientCore: Disposable, AutoCloseable, NovaClientCoreInterface
         it,
         
         FfiConverterString.lower(`sdp`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(NovaCoreException::class)override fun `buildSharedVideoPayload`(`url`: kotlin.String?, `playing`: kotlin.Boolean, `timeSecs`: kotlin.Double): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(NovaCoreException) { _status ->
+    UniffiLib.uniffi_nova_core_fn_method_novaclientcore_build_shared_video_payload(
+        it,
+        
+        FfiConverterOptionalString.lower(`url`),
+        FfiConverterBoolean.lower(`playing`),
+        FfiConverterDouble.lower(`timeSecs`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(NovaCoreException::class)override fun `buildSubtitlePayload`(`text`: kotlin.String, `isFinal`: kotlin.Boolean): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(NovaCoreException) { _status ->
+    UniffiLib.uniffi_nova_core_fn_method_novaclientcore_build_subtitle_payload(
+        it,
+        
+        FfiConverterString.lower(`text`),
+        FfiConverterBoolean.lower(`isFinal`),_status)
 }
     }
     )

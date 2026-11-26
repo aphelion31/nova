@@ -1,35 +1,54 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Exact Jitsi Meet UI Design Tokens (jitsiTokens.json + tokens.json) */
 :root {
-  --bg-page: #f8fafc;
-  --bg-surface: #ffffff;
-  --bg-subtle: #f1f5f9;
-  --ink-primary: #0f172a;
-  --ink-secondary: #475569;
-  --ink-muted: #64748b;
-  --border-subtle: rgba(15, 23, 42, 0.1);
-  --accent: #2563eb;
-  --accent-soft: rgba(37, 99, 235, 0.12);
-}
-
-.dark {
-  --bg-page: #0b0f17;
-  --bg-surface: #121826;
-  --bg-subtle: #1b2436;
-  --ink-primary: #f8fafc;
-  --ink-secondary: #cbd5e1;
-  --ink-muted: #94a3b8;
-  --border-subtle: rgba(255, 255, 255, 0.09);
-  --accent: #3b82f6;
-  --accent-soft: rgba(59, 130, 246, 0.18);
+  --jitsi-surface-01: #040404;
+  --jitsi-surface-02: #141414;
+  --jitsi-surface-03: #292929;
+  --jitsi-surface-04: #3D3D3D;
+  --jitsi-surface-05: #525252;
+  --jitsi-text-01: #FFFFFF;
+  --jitsi-text-02: #C2C2C2;
+  --jitsi-text-03: #A3A3A3;
+  --jitsi-action: #246FE5;
+  --jitsi-action-hover: #4687ED;
+  --jitsi-action-active: #0056E0;
+  --jitsi-welcome-btn: #0074E0;
+  --jitsi-danger: #CB2233;
+  --jitsi-danger-hover: #E04757;
+  --jitsi-success: #189B55;
+  --jitsi-warning: #F8AE1A;
+  --bg-page: #040404;
+  --bg-surface: #141414;
+  --bg-subtle: #292929;
+  --ink-primary: #FFFFFF;
+  --ink-secondary: #C2C2C2;
+  --ink-muted: #A3A3A3;
+  --border-subtle: #3D3D3D;
+  --accent: #246FE5;
+  --accent-soft: rgba(36, 111, 229, 0.2);
 }
 
 html,
 body {
-  background-color: var(--bg-page);
-  color: var(--ink-primary);
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--jitsi-surface-01);
+  color: var(--jitsi-text-01);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.jitsi-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.jitsi-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.jitsi-scroll::-webkit-scrollbar-thumb {
+  background: #3D3D3D;
+  border-radius: 9999px;
 }
 
 @keyframes float-reaction {
@@ -49,4 +68,19 @@ body {
 
 .animate-reaction {
   animation: float-reaction 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast {
+  animation: toast-in 0.2s ease-out forwards;
 }

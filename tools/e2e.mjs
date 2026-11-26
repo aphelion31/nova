@@ -1,4 +1,4 @@
-// End-to-end 2-peer WebRTC SFU verification, live E2EE check, & 2x retina screenshot capture for Nova.
+// End-to-end 2-peer WebRTC SFU verification, Jitsi UI workflow check, live E2EE, & 2x retina screenshot capture.
 // Run: BASE=http://127.0.0.1:3000 node tools/e2e.mjs
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -76,7 +76,7 @@ function attachListeners(page, label) {
 }
 
 try {
-  // Seed clean rooms first so home.png displays realistic recent rooms without timestamps/smoke junk.
+  // Seed clean rooms first so home.png displays realistic rooms without smoke-test noise.
   await seedDemoRoom({ name: "product-standup", subject: "Product Standup" });
   await seedDemoRoom({ name: "design-review", subject: "Design Review", password: "nova-demo" });
 
@@ -97,21 +97,21 @@ try {
   attachListeners(pageA, "Alice");
   attachListeners(pageB, "Bob");
 
-  // 1. Capture Login page & Home page
+  // 1. Capture Login page & Jitsi-style Welcome Home page
   await pageA.goto(`${BASE}/login`, { waitUntil: "networkidle" });
   await pageA.waitForTimeout(250);
   await pageA.screenshot({ path: path.join(SHOT_DIR, "login.png") });
   console.log("Captured login.png");
 
   await pageA.goto(`${BASE}/`, { waitUntil: "networkidle" });
-  await pageA.getByText("2 rooms").waitFor({ timeout: 5000 });
+  await pageA.getByText(/2 rooms/).waitFor({ timeout: 5000 });
   await pageA.waitForTimeout(250);
   await pageA.screenshot({ path: path.join(SHOT_DIR, "home.png") });
   console.log("Captured home.png");
 
-  // 2. Navigate to Prejoin & capture
+  // 2. Navigate to Jitsi-style Prejoin split-screen & capture
   await pageA.getByRole("textbox", { name: "Room name" }).fill(room);
-  await pageA.getByRole("button", { name: "Join meeting" }).click();
+  await pageA.getByRole("button", { name: "Start meeting" }).click();
   await pageA.waitForURL(`**/room/${room}`);
   await pageA.waitForFunction(() => {
     const v = document.querySelector("video");
@@ -120,9 +120,9 @@ try {
   await pageA.screenshot({ path: path.join(SHOT_DIR, "prejoin.png") });
   console.log("Captured prejoin.png");
 
-  // 3. Join both Alice & Bob into the same room -> verify real str0m SFU ICE + remote video
+  // 3. Join both Alice & Bob -> verify str0m SFU ICE + decoded remote video + conference timer
   await pageA.getByRole("textbox", { name: "Your display name" }).fill("Alice Chen");
-  await pageA.getByRole("button", { name: "Join meeting" }).click();
+  await pageA.getByRole("button", { name: "Join meeting", exact: true }).click();
 
   await pageB.goto(`${BASE}/room/${room}`, { waitUntil: "networkidle" });
   await pageB.waitForFunction(() => {
@@ -130,12 +130,11 @@ try {
     return Boolean(v && v.readyState >= 2 && v.videoWidth > 0);
   }, undefined, { timeout: 10000 });
   await pageB.getByRole("textbox", { name: "Your display name" }).fill("Bob Pratama");
-  await pageB.getByRole("button", { name: "Join meeting" }).click();
+  await pageB.getByRole("button", { name: "Join meeting", exact: true }).click();
 
   await pageA.getByTestId("ice-status").getByText(/ICE: (connected|completed)/).waitFor({ timeout: 15000 });
   await pageB.getByTestId("ice-status").getByText(/ICE: (connected|completed)/).waitFor({ timeout: 15000 });
 
-  // Wait until both peers render 2 video tiles with actual decoded remote frames (videoWidth > 0)
   await pageA.waitForFunction(() => {
     const vids = Array.from(document.querySelectorAll("video"));
     return vids.length >= 2 && vids.every((v) => v.readyState >= 2 && v.videoWidth > 0);
@@ -145,16 +144,21 @@ try {
     return vids.length >= 2 && vids.every((v) => v.readyState >= 2 && v.videoWidth > 0);
   }, undefined, { timeout: 20000 });
 
-  await pageA.waitForTimeout(400);
+  // Allow join toast to clear naturally so meeting-grid.png showcases the clean Jitsi stage + ConferenceInfo timer.
+  await pageA.waitForTimeout(3200);
   await pageA.screenshot({ path: path.join(SHOT_DIR, "meeting-grid.png") });
   console.log("Captured meeting-grid.png (2-peer SFU connected with decoded remote video)");
 
-  // 4. Test Chat, Polls, Reactions, Raise Hand across peers
+  // 4. Test Chat drawer (Chat + Reply + Polls + File sharing) & Raise Hand across peers
   await pageA.getByRole("button", { name: "Chat", exact: true }).click();
   await pageA.getByPlaceholder("Type a message...").fill("SFU media looks crisp!");
   await pageA.getByRole("button", { name: "Send message" }).click();
   await pageB.getByRole("button", { name: "Chat", exact: true }).click();
   await pageB.getByText("SFU media looks crisp!").waitFor({ timeout: 8000 });
+
+  // Open Participants right drawer briefly to confirm Jitsi dual-drawer + Breakout UI
+  await pageA.getByRole("button", { name: "Participants", exact: true }).click();
+  await pageA.getByRole("button", { name: "Invite Someone" }).waitFor({ timeout: 5000 });
 
   await pageA.getByRole("button", { name: "Polls", exact: true }).click();
   await pageA.getByPlaceholder("Ask a question...").fill("Ready for mobile UniFFI demo?");
@@ -170,9 +174,36 @@ try {
   await pageA.waitForTimeout(250);
   await pageA.screenshot({ path: path.join(SHOT_DIR, "meeting-chat-polls.png") });
   console.log("Captured meeting-chat-polls.png");
+  await pageA.getByRole("button", { name: "Close participants pane" }).click();
+  await pageA.getByRole("button", { name: "Close chat panel" }).click();
 
-  // 5. Collaborative Whiteboard sync
-  await pageA.getByRole("button", { name: "Whiteboard" }).click();
+  // 5. File sharing API + real-time WS delivery into Files tab
+  const upRes = await fetch(`${BASE}/api/rooms/${room}/files`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      filename: "sprint-notes.txt",
+      mime_type: "text/plain",
+      data_base64: Buffer.from("Nova sprint notes\n").toString("base64"),
+      sender_name: "Alice Chen",
+    }),
+  });
+  assert.equal(upRes.ok, true, "file upload failed");
+  await pageB.getByRole("button", { name: "Files", exact: true }).click();
+  await pageB.getByText("sprint-notes.txt").waitFor({ timeout: 5000 });
+  console.log("Verified room file upload & WS broadcast");
+
+  // 6. More Actions Overflow Menu -> Jitsi Tabbed Settings Modal
+  await pageA.getByRole("button", { name: "More actions", exact: true }).click();
+  await pageA.getByRole("button", { name: "Settings", exact: true }).click();
+  await pageA.waitForTimeout(200);
+  await pageA.screenshot({ path: path.join(SHOT_DIR, "meeting-settings.png") });
+  console.log("Captured meeting-settings.png");
+  await pageA.getByRole("button", { name: "Close settings modal" }).click();
+
+  // 7. Collaborative Whiteboard via More Actions menu
+  await pageA.getByRole("button", { name: "More actions", exact: true }).click();
+  await pageA.getByRole("button", { name: "Whiteboard", exact: true }).click();
   const canvas = pageA.locator("canvas").last();
   const box = await canvas.boundingBox();
   assert.ok(box, "whiteboard canvas missing");
@@ -186,14 +217,16 @@ try {
   console.log("Captured meeting-whiteboard.png");
   await pageA.getByRole("button", { name: "Close whiteboard" }).click();
 
-  // 6. Live E2EE passphrase & WebRTC encoded transform verification (both moderator Alice and guest Bob)
-  await pageA.getByRole("button", { name: "Security & E2EE" }).click();
+  // 8. Live E2EE passphrase & WebRTC encoded transform verification (Alice & Bob)
+  await pageA.getByRole("button", { name: "More actions", exact: true }).click();
+  await pageA.getByRole("button", { name: "Security options", exact: true }).click();
   await pageA.getByPlaceholder("Shared E2EE key passphrase...").fill("nova-e2ee-secret");
   await pageA.getByRole("button", { name: "Apply" }).click();
   await pageA.getByRole("button", { name: "Close security modal" }).click();
 
-  await pageB.getByRole("button", { name: "Security & E2EE" }).click();
-  assert.equal(await pageB.getByText("Enable waiting lobby").count(), 0, "non-moderator should not see moderator lobby toggle");
+  await pageB.getByRole("button", { name: "More actions", exact: true }).click();
+  await pageB.getByRole("button", { name: "Security options", exact: true }).click();
+  assert.equal(await pageB.getByText("Enable waiting lobby").count(), 0, "non-moderator should not see lobby toggle");
   await pageB.getByPlaceholder("Shared E2EE key passphrase...").fill("nova-e2ee-secret");
   await pageB.getByRole("button", { name: "Apply" }).click();
   await pageB.getByRole("button", { name: "Close security modal" }).click();
@@ -211,7 +244,7 @@ try {
   }, undefined, { timeout: 10000 });
   console.log("Verified live E2EE key derivation & continuous 2-peer video decode");
 
-  // 7. Drop-in Jitsi External API embed test
+  // 9. Drop-in Jitsi External API embed test
   const embedPage = await ctxA.newPage();
   attachListeners(embedPage, "Embed");
   await embedPage.setContent(`<!doctype html><html><head><link rel="icon" href="data:,"></head><body style="margin:0;height:100vh">
@@ -232,7 +265,7 @@ try {
   await embedPage.evaluate(() => window.api.dispose());
   await embedPage.close();
 
-  // 8. Mobile viewport responsive check (zero horizontal overflow)
+  // 10. Mobile viewport responsive check (zero horizontal overflow)
   const mobilePage = await ctxA.newPage();
   attachListeners(mobilePage, "Mobile");
   await mobilePage.setViewportSize({ width: 375, height: 812 });
@@ -245,7 +278,7 @@ try {
   assert.deepEqual(pageErrors, [], `page errors: ${pageErrors.join("; ")}`);
   assert.deepEqual(failedRequests, [], `failed requests: ${failedRequests.join("; ")}`);
 
-  console.log("PASS: 2-peer WebRTC str0m SFU, chat, polls, hand, whiteboard, live E2EE, external_api.js, 6 screenshots, 0 errors");
+  console.log("PASS: 2-peer WebRTC str0m SFU, Jitsi UI, Settings, Files, Chat/Polls, Whiteboard, E2EE, external_api.js, 7 screenshots, 0 errors");
   await ctxA.close();
   await ctxB.close();
 } finally {
