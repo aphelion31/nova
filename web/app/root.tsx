@@ -18,7 +18,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="theme-color" content="#040404" />
         <title>Nova Meet</title>
         <link rel="icon" type="image/svg+xml" href="/brand-assets/favicon.svg" />
-        <link rel="apple-touch-icon" href="/brand-assets/icon.svg" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/brand-assets/favicon-32x32.png" />
+        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/brand-assets/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.webmanifest" />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
         <Meta />

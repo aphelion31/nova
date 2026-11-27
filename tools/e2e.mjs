@@ -244,6 +244,44 @@ try {
   }, undefined, { timeout: 10000 });
   console.log("Verified live E2EE key derivation & continuous 2-peer video decode");
 
+  // 8b. Favicon check & Visitor JoinMeetingDialog + PiP persistence check
+  const favRes = await fetch(`${BASE}/favicon.ico`);
+  assert.equal(favRes.status, 200, "favicon.ico returned non-200");
+  assert.ok(
+    (favRes.headers.get("content-type") || "").includes("image/x-icon"),
+    "favicon.ico missing image/x-icon content-type"
+  );
+
+  const ctxV = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    deviceScaleFactor: 2,
+    permissions: ["camera", "microphone"],
+  });
+  const pageV = await ctxV.newPage();
+  attachListeners(pageV, "Visitor");
+  await pageV.goto(`${BASE}/room/${room}?visitor=true`, { waitUntil: "networkidle" });
+  await pageV.getByRole("textbox", { name: "Your display name" }).waitFor({ timeout: 10000 });
+  await pageV.getByRole("textbox", { name: "Your display name" }).fill("Clara Viewer");
+  await pageV.getByRole("button", { name: "Join meeting", exact: true }).click();
+  await pageV.getByRole("dialog", { name: "Joining meeting" }).waitFor({ timeout: 10000 });
+  await pageV.getByText("You're currently a viewer in this conference.").waitFor({ timeout: 5000 });
+  await pageV.waitForTimeout(800);
+  await pageV.screenshot({ path: path.join(SHOT_DIR, "meeting-visitor-dialog.png") });
+  console.log("Captured meeting-visitor-dialog.png");
+  await pageV.getByRole("button", { name: "OK", exact: true }).click();
+  assert.equal(await pageV.getByRole("dialog", { name: "Joining meeting" }).count(), 0);
+  await pageV.evaluate(() => {
+    document.dispatchEvent(new Event("enterpictureinpicture", { bubbles: true }));
+    document.dispatchEvent(new Event("leavepictureinpicture", { bubbles: true }));
+  });
+  await pageV.waitForTimeout(200);
+  assert.equal(
+    await pageV.getByRole("dialog", { name: "Joining meeting" }).count(),
+    0,
+    "JoinMeetingDialog reappeared after PiP transition"
+  );
+  await ctxV.close();
+
   // 9. Drop-in Jitsi External API embed test
   const embedPage = await ctxA.newPage();
   attachListeners(embedPage, "Embed");
@@ -278,7 +316,7 @@ try {
   assert.deepEqual(pageErrors, [], `page errors: ${pageErrors.join("; ")}`);
   assert.deepEqual(failedRequests, [], `failed requests: ${failedRequests.join("; ")}`);
 
-  console.log("PASS: 2-peer WebRTC str0m SFU, Jitsi UI, Settings, Files, Chat/Polls, Whiteboard, E2EE, external_api.js, 7 screenshots, 0 errors");
+  console.log("PASS: 2-peer WebRTC str0m SFU, Jitsi UI, Visitor dialog, Settings, Files, Chat/Polls, Whiteboard, E2EE, external_api.js, 8 screenshots, 0 errors");
   await ctxA.close();
   await ctxB.close();
 } finally {

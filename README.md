@@ -1,9 +1,6 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="web/public/brand-assets/logo_dark.svg">
-  <img src="web/public/brand-assets/logo.svg" alt="Nova Meet logo" width="170">
-</picture>
+<img src="web/public/brand-assets/icon.svg" alt="Nova" width="128">
 
 # Nova
 
@@ -26,7 +23,7 @@
   <img src="docs/media/nova-demo.gif" alt="Nova Meet Jitsi-aligned UI walkthrough" width="900">
 </a>
 
-<p><em>Nova walkthrough — Welcome, Prejoin, 2-peer str0m SFU grid, Chat/Polls, Settings &amp; Whiteboard (click for MP4)</em></p>
+<p><em>Nova walkthrough — Welcome, Prejoin, 2-peer str0m SFU grid, Chat/Polls, Settings, Whiteboard &amp; Visitor dialog (click for MP4)</em></p>
 
 </div>
 
@@ -101,7 +98,8 @@ Measured on macOS `arm64` (`--release`) against the checked-out upstream [`jitsi
     <td align="center"><a href="docs/screenshots/meeting-whiteboard.png"><img src="docs/screenshots/meeting-whiteboard.png" alt="Nova collaborative Whiteboard" width="440" /></a><br>Collaborative Whiteboard</td>
   </tr>
   <tr>
-    <td align="center" colspan="2"><a href="docs/screenshots/login.png"><img src="docs/screenshots/login.png" alt="Nova Argon2id host sign in" width="440" /></a><br>Argon2id host sign-in</td>
+    <td align="center"><a href="docs/screenshots/meeting-visitor-dialog.png"><img src="docs/screenshots/meeting-visitor-dialog.png" alt="Nova Visitor mode JoinMeetingDialog" width="440" /></a><br>Visitor mode &amp; <code>JoinMeetingDialog</code></td>
+    <td align="center"><a href="docs/screenshots/login.png"><img src="docs/screenshots/login.png" alt="Nova Argon2id host sign in" width="440" /></a><br>Argon2id host sign-in</td>
   </tr>
 </table>
 
@@ -111,13 +109,13 @@ Measured on macOS `arm64` (`--release`) against the checked-out upstream [`jitsi
 
 - **Visual System (`#040404` / `#141414` / `#292929` / `#246FE5`):** Jitsi blue-gradient Welcome screen, split-screen Prejoin (`Join without audio`, `Join audio-only`, device selectors, virtual backgrounds), top `ConferenceInfo` (`MM:SS` timer + live `getStats()` Connection Stats popover), compact floating Toolbox with device chevrons & `...` Overflow Menu, left `Chat / Polls / CC / Files` drawer, right `Participants & Breakout Rooms` pane, bottom-left toast stack, and post-call 5-star feedback persisted in SQLite.
 - **Audio, Video & Captions:** Device hot-swapping, WebRTC noise suppression & echo cancellation toggles, mirror toggle, Video Quality presets (`HD` / `SD` / `Low` / `Audio-Only`), Canvas 2D virtual backgrounds (`Slight blur`, `Blur`, `Studio`, `Ocean`, `Warm loft`, `Minimal dark`), Web Speech API Closed Captions + `.txt` transcript export, Talk-While-Muted detection, Fullscreen, Picture-in-Picture, and local WebM recording.
-- **Security & Moderation:** Argon2id (`Algorithm::Argon2id`) host accounts with HMAC-SHA256 `HttpOnly` sessions, Jitsi-compatible HS256 room JWTs, room password lock, knock lobby with quick-Admit toasts, HKDF + AES-256-GCM E2EE (`nova-core::e2ee` + WebRTC Encoded Transform for all peers), AV moderation (`start_audio_muted` / `start_video_muted`), Follow-Me layout sync, `Mute everyone`, and `End meeting for all`.
+- **Security, Visitors & Moderation:** Argon2id (`Algorithm::Argon2id`) host accounts with HMAC-SHA256 `HttpOnly` sessions, Jitsi-compatible HS256 room JWTs (incl. `visitor` claim), room password lock, knock lobby with quick-Admit toasts, HKDF + AES-256-GCM E2EE (`nova-core::e2ee` + WebRTC Encoded Transform for all peers), Visitor/Viewer mode (`?visitor=true`, PiP-safe `JoinMeetingDialog` backed by central state, `Promote`/`Demote`), AV moderation (`start_audio_muted` / `start_video_muted`), Follow-Me layout sync, `Mute everyone`, and `End meeting for all`.
 - **Collaboration & Shared Media:** Chat with replies & DMs, room file sharing (`<= 5 MiB` in SQLite), live polls, synced YouTube/MP4 Shared Video player, raise hand, floating emoji reactions, SFU-isolated breakout rooms, whiteboard w/ PNG export, speaker stats, keyboard shortcuts (`?`, `M`, `V`, `C`, `P`, `R`, `T`, `S`, `W`, `F`, `Space`), and EN/ID localization.
 - **Intentional Scope Exclusions ([`ADR-006`](rust/DECISIONS.md)):** Legacy XMPP/BOSH wire protocol (`Prosody`), `Jigasi` SIP/PSTN dial-in, headless Chrome `Jibri` cloud recording/RTMP, and SaaS connectors (Dropbox, Salesforce, Amplitude, Google/Microsoft Calendar OAuth, Etherpad).
 
 ## Native Mobile (Rust UniFFI)
 
-Instead of bundling React Native (`0.85` + Hermes) or Flutter (Dart VM), `crates/nova-core` (`uniffi 0.33`) compiles signaling codecs, URL parsing, `RoomSnapshot` state reduction, and E2EE key derivation into native Swift (`mobile/ios/`) and Kotlin (`mobile/android/`) bindings for thin SwiftUI and Jetpack Compose apps (Welcome, Recent Meetings, Prejoin, Audio-Only, Car Mode, Tile/Filmstrip, Chat/DM, Polls, Participants/Lobby, Breakouts, Security/E2EE, Stats, Settings).
+Instead of bundling React Native (`0.85` + Hermes) or Flutter (Dart VM), `crates/nova-core` (`uniffi 0.33`) compiles signaling codecs, URL parsing, `RoomSnapshot` state reduction (incl. `ActiveDialog` / `hide_dialog()` / `set_pip_mode()` so Visitor `JoinMeetingDialog` never reappears across PiP transitions), and E2EE key derivation into native Swift (`mobile/ios/`) and Kotlin (`mobile/android/`, `supportsPictureInPicture`) bindings for thin SwiftUI and Jetpack Compose apps (Welcome, Recent Meetings, Prejoin, Audio-Only, Join as Viewer, Car Mode, Tile/Filmstrip, Chat/DM, Polls, Participants/Lobby/Promote, Breakouts, Security/E2EE, Stats, Settings).
 
 ```bash
 ./mobile/scripts/generate-bindings.sh
