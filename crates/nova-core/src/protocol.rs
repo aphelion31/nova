@@ -36,6 +36,8 @@ pub struct Participant {
     pub breakout_id: Option<String>,
     pub joined_at: i64,
     pub speaking_ms: u64,
+    #[serde(default)]
+    pub is_visitor: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -157,6 +159,8 @@ pub enum ModerationAction {
     MuteVideo,
     Kick,
     GrantModerator,
+    PromoteVisitor,
+    DemoteVisitor,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -176,6 +180,8 @@ pub enum ClientMessage {
         email: Option<String>,
         #[serde(default)]
         avatar_url: Option<String>,
+        #[serde(default)]
+        visitor: bool,
     },
     RtcOffer {
         sdp: String,
@@ -312,6 +318,8 @@ pub enum ServerMessage {
         follow_me: Option<FollowMeState>,
         #[serde(default)]
         files: Vec<SharedFileMeta>,
+        #[serde(default)]
+        is_visitor: bool,
     },
     LobbyWaiting {
         room: String,
@@ -406,6 +414,7 @@ mod tests {
             video_muted: true,
             email: Some("alice@example.com".into()),
             avatar_url: None,
+            visitor: false,
         };
         let raw = serde_json::to_string(&join).expect("serialize join");
         assert!(raw.contains(r#""type":"join""#));
@@ -463,5 +472,15 @@ mod tests {
         let sraw = serde_json::to_string(&sv).expect("serialize shared_video_updated");
         let sback: ServerMessage = serde_json::from_str(&sraw).expect("deserialize shared_video_updated");
         assert!(matches!(sback, ServerMessage::SharedVideoUpdated { state: Some(_) }));
+
+        for (action, expected) in [
+            (ModerationAction::PromoteVisitor, r#""promote_visitor""#),
+            (ModerationAction::DemoteVisitor, r#""demote_visitor""#),
+        ] {
+            let raw = serde_json::to_string(&action).expect("serialize moderation action");
+            assert_eq!(raw, expected);
+            let back: ModerationAction = serde_json::from_str(&raw).expect("deserialize moderation action");
+            assert_eq!(back, action);
+        }
     }
 }

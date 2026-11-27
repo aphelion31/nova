@@ -98,15 +98,21 @@ public final class NovaClientBridge: ObservableObject {
         errorText = nil
     }
 
-    public func join(meetingUrl: String, displayName: String, password: String? = nil, audioOnlyMode: Bool = false) {
+    public func join(meetingUrl: String, displayName: String, password: String? = nil, audioOnlyMode: Bool = false, joinAsVisitor: Bool = false) {
         do {
             let parsed = try parseNovaMeetingUrl(rawUrl: meetingUrl)
             core = NovaClientCore(room: parsed.room)
             snapshot = core.snapshot()
             initialOfferSent = false
             self.displayName = displayName
+            let isVisitor = joinAsVisitor || parsed.visitor
             self.audioOnly = audioOnlyMode
-            if audioOnlyMode { self.videoMuted = true }
+            if audioOnlyMode || isVisitor {
+                self.videoMuted = true
+            }
+            if isVisitor {
+                self.audioMuted = true
+            }
             errorText = nil
             savePrefs()
             recordRecent(room: parsed.room, url: meetingUrl)
@@ -125,7 +131,8 @@ public final class NovaClientBridge: ObservableObject {
                 password: password,
                 token: parsed.token,
                 audioMuted: audioMuted,
-                videoMuted: videoMuted
+                videoMuted: videoMuted,
+                visitor: isVisitor
             )
             sendText(joinPayload)
             listenLoop(task: task)
@@ -257,6 +264,14 @@ public final class NovaClientBridge: ObservableObject {
         try? core.deriveE2eeKeyB64(passphrase: passphrase, generation: 1)
     }
 
+    public func hideDialog() {
+        snapshot = core.hideDialog()
+    }
+
+    public func setPipMode(_ enabled: Bool) {
+        snapshot = core.setPipMode(enabled: enabled)
+    }
+
     public func savePrefs() {
         let defaults = UserDefaults.standard
         defaults.set(serverBaseUrl, forKey: "nova.serverBaseUrl")
@@ -276,6 +291,7 @@ public final class NovaClientBridge: ObservableObject {
         carMode = false
         callSeconds = 0
         selectedRoomUrl = nil
+        snapshot = core.setPipMode(enabled: false)
     }
 
     public static func randomRoomSlug() -> String {
@@ -348,6 +364,11 @@ public final class NovaClientBridge: ObservableObject {
                                     self.rtcAdapter?.setAudioMuted(true)
                                 case "mute_video":
                                     self.videoMuted = true
+                                    self.rtcAdapter?.setVideoMuted(true)
+                                case "demote_visitor":
+                                    self.audioMuted = true
+                                    self.videoMuted = true
+                                    self.rtcAdapter?.setAudioMuted(true)
                                     self.rtcAdapter?.setVideoMuted(true)
                                 case "kick":
                                     self.leave()

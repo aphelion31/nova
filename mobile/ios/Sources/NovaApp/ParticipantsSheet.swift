@@ -26,10 +26,16 @@ struct ParticipantsSheet: View {
                             Text(peer.displayName)
                             if peer.isModerator {
                                 Text("Host").font(.caption2).foregroundStyle(.orange)
+                            } else if peer.isVisitor {
+                                Text("Viewer").font(.caption2).foregroundStyle(.blue)
                             }
                         }
                         Spacer()
                         if bridge.snapshot.isModerator && peer.id != bridge.snapshot.selfId {
+                            if peer.isVisitor {
+                                Button("Promote") { bridge.moderate(targetId: peer.id, action: "promote_visitor") }
+                                    .buttonStyle(.borderedProminent)
+                            }
                             Button("Mute") { bridge.moderate(targetId: peer.id, action: "mute_audio") }
                                 .buttonStyle(.bordered)
                             Button("Kick", role: .destructive) { bridge.moderate(targetId: peer.id, action: "kick") }

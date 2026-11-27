@@ -4,11 +4,19 @@ use crate::protocol::{
 };
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActiveDialog {
+    VisitorJoinMeeting,
+}
+
 #[derive(Debug, Clone)]
 pub struct RoomSnapshot {
     pub self_id: Option<String>,
     pub room: String,
     pub is_moderator: bool,
+    pub is_visitor: bool,
+    pub active_dialog: Option<ActiveDialog>,
+    pub in_pip_mode: bool,
     pub in_lobby: bool,
     pub lobby_message: Option<String>,
     pub rejected_reason: Option<String>,
@@ -38,6 +46,9 @@ impl RoomSnapshot {
             self_id: None,
             room: room_name.clone(),
             is_moderator: false,
+            is_visitor: false,
+            active_dialog: None,
+            in_pip_mode: false,
             in_lobby: false,
             lobby_message: None,
             rejected_reason: None,
@@ -69,6 +80,18 @@ impl RoomSnapshot {
         }
     }
 
+    pub fn hide_dialog(&mut self) {
+        self.active_dialog = None;
+    }
+
+    pub fn set_pip_mode(&mut self, enabled: bool) {
+        self.in_pip_mode = enabled;
+    }
+
+    pub fn should_show_visitor_join_dialog(&self) -> bool {
+        !self.in_pip_mode && self.active_dialog == Some(ActiveDialog::VisitorJoinMeeting)
+    }
+
     pub fn apply_server_event(&mut self, ev: &ServerMessage) {
         self.sdp_answer = None;
         self.pending_renegotiate_sdp = None;
@@ -87,11 +110,14 @@ impl RoomSnapshot {
                 shared_video,
                 follow_me,
                 files,
+                is_visitor,
                 ..
             } => {
                 self.self_id = Some(self_id.clone());
                 self.room = room.clone();
                 self.is_moderator = *is_moderator;
+                self.is_visitor = *is_visitor;
+                self.active_dialog = is_visitor.then_some(ActiveDialog::VisitorJoinMeeting);
                 self.in_lobby = false;
                 self.lobby_message = None;
                 self.rejected_reason = None;
@@ -113,6 +139,7 @@ impl RoomSnapshot {
                 self.room = room.clone();
                 self.in_lobby = true;
                 self.lobby_message = Some(message.clone());
+                self.active_dialog = None;
             }
             ServerMessage::LobbyRequest { entry } => {
                 if !self.lobby.iter().any(|item| item.peer_id == entry.peer_id) {
@@ -125,6 +152,7 @@ impl RoomSnapshot {
             ServerMessage::LobbyRejected { reason } => {
                 self.in_lobby = false;
                 self.rejected_reason = Some(reason.clone());
+                self.active_dialog = None;
             }
             ServerMessage::RtcAnswer { sdp } => {
                 self.sdp_answer = Some(sdp.clone());
@@ -146,6 +174,10 @@ impl RoomSnapshot {
             ServerMessage::ParticipantUpdated { participant } => {
                 if self.self_id.as_deref() == Some(participant.id.as_str()) {
                     self.is_moderator = participant.is_moderator;
+                    self.is_visitor = participant.is_visitor;
+                    if !participant.is_visitor && self.active_dialog == Some(ActiveDialog::VisitorJoinMeeting) {
+                        self.active_dialog = None;
+                    }
                 }
                 if let Some(existing) = self.participants.iter_mut().find(|p| p.id == participant.id) {
                     *existing = participant.clone();
@@ -202,6 +234,7 @@ impl RoomSnapshot {
             }
             ServerMessage::ConferenceEnded { by_name } => {
                 self.conference_ended_by = Some(by_name.clone());
+                self.active_dialog = None;
             }
             ServerMessage::Error { message, .. } => {
                 self.last_error = Some(message.clone());
@@ -239,6 +272,7 @@ mod tests {
             breakout_id: None,
             joined_at: 100,
             speaking_ms: 0,
+            is_visitor: false,
         }
     }
 
@@ -274,6 +308,7 @@ mod tests {
             shared_video: None,
             follow_me: None,
             files: vec![],
+            is_visitor: false,
         });
         assert!(!snap.in_lobby);
         assert!(snap.is_moderator);
@@ -373,5 +408,138 @@ mod tests {
             participant: mk_participant("p1", 0.1, false),
         });
         assert!(snap.pending_renegotiate_sdp.is_none());
+    }
+
+    #[test]
+    fn visitor_join_dialog_stays_hidden_across_pip_and_events() {
+        let mut visitor_snap = RoomSnapshot::new("stage");
+        visitor_snap.apply_server_event(&ServerMessage::Joined {
+            self_id: "v1".into(),
+            room: "stage".into(),
+            is_moderator: false,
+            ice_servers: vec![],
+            participants: vec![],
+            messages: vec![],
+            polls: vec![],
+            breakouts: vec![],
+            strokes: vec![],
+            lobby: vec![],
+            security: RoomSecurityState {
+                locked: false,
+                lobby_enabled: false,
+                e2ee_enabled: false,
+                has_password: false,
+                subject: "Stage".into(),
+                start_audio_muted: false,
+                start_video_muted: false,
+            },
+            shared_video: None,
+            follow_me: None,
+            files: vec![],
+            is_visitor: true,
+        });
+
+        assert!(visitor_snap.is_visitor);
+        assert_eq!(visitor_snap.active_dialog, Some(ActiveDialog::VisitorJoinMeeting));
+        assert!(visitor_snap.should_show_visitor_join_dialog());
+
+        // Entering PiP before dismissing hides the dialog; exiting PiP restores it.
+        visitor_snap.set_pip_mode(true);
+        assert!(!visitor_snap.should_show_visitor_join_dialog());
+        visitor_snap.set_pip_mode(false);
+        assert!(visitor_snap.should_show_visitor_join_dialog());
+
+        // Dismissing clears central active_dialog; PiP transitions and events must not reopen it.
+        visitor_snap.hide_dialog();
+        assert_eq!(visitor_snap.active_dialog, None);
+        assert!(!visitor_snap.should_show_visitor_join_dialog());
+
+        visitor_snap.set_pip_mode(true);
+        visitor_snap.set_pip_mode(false);
+        assert_eq!(visitor_snap.active_dialog, None);
+        assert!(!visitor_snap.should_show_visitor_join_dialog());
+
+        visitor_snap.apply_server_event(&ServerMessage::ParticipantJoined {
+            participant: mk_participant("p2", 0.0, true),
+        });
+        visitor_snap.apply_server_event(&ServerMessage::ChatMessage {
+            message: ChatMessage {
+                id: "m1".into(),
+                sender_id: "p2".into(),
+                sender_name: "Host".into(),
+                recipient_id: None,
+                body: "welcome".into(),
+                created_at: 1,
+                reply_to_id: None,
+                reply_to_sender: None,
+                reply_to_body: None,
+            },
+        });
+        assert_eq!(visitor_snap.active_dialog, None);
+        assert!(!visitor_snap.should_show_visitor_join_dialog());
+
+        // Promoting a visitor while dialog is open clears it automatically.
+        let mut promoted = RoomSnapshot::new("stage");
+        promoted.apply_server_event(&ServerMessage::Joined {
+            self_id: "v2".into(),
+            room: "stage".into(),
+            is_moderator: false,
+            ice_servers: vec![],
+            participants: vec![],
+            messages: vec![],
+            polls: vec![],
+            breakouts: vec![],
+            strokes: vec![],
+            lobby: vec![],
+            security: RoomSecurityState {
+                locked: false,
+                lobby_enabled: false,
+                e2ee_enabled: false,
+                has_password: false,
+                subject: "Stage".into(),
+                start_audio_muted: false,
+                start_video_muted: false,
+            },
+            shared_video: None,
+            follow_me: None,
+            files: vec![],
+            is_visitor: true,
+        });
+        assert!(promoted.should_show_visitor_join_dialog());
+        promoted.apply_server_event(&ServerMessage::ParticipantUpdated {
+            participant: mk_participant("v2", 0.0, true),
+        });
+        assert!(!promoted.is_visitor);
+        assert_eq!(promoted.active_dialog, None);
+        assert!(!promoted.should_show_visitor_join_dialog());
+
+        // Non-visitor join never opens VisitorJoinMeeting.
+        let mut regular = RoomSnapshot::new("stage");
+        regular.apply_server_event(&ServerMessage::Joined {
+            self_id: "p1".into(),
+            room: "stage".into(),
+            is_moderator: true,
+            ice_servers: vec![],
+            participants: vec![],
+            messages: vec![],
+            polls: vec![],
+            breakouts: vec![],
+            strokes: vec![],
+            lobby: vec![],
+            security: RoomSecurityState {
+                locked: false,
+                lobby_enabled: false,
+                e2ee_enabled: false,
+                has_password: false,
+                subject: "Stage".into(),
+                start_audio_muted: false,
+                start_video_muted: false,
+            },
+            shared_video: None,
+            follow_me: None,
+            files: vec![],
+            is_visitor: false,
+        });
+        assert!(!regular.should_show_visitor_join_dialog());
     }
 }

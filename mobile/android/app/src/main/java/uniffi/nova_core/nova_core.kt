@@ -777,7 +777,11 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_nova_core_checksum_method_novaclientcore_derive_e2ee_key_b64(
     ): Int
+    external fun uniffi_nova_core_checksum_method_novaclientcore_hide_dialog(
+    ): Int
     external fun uniffi_nova_core_checksum_method_novaclientcore_parse_meeting_url(
+    ): Int
+    external fun uniffi_nova_core_checksum_method_novaclientcore_set_pip_mode(
     ): Int
     external fun uniffi_nova_core_checksum_method_novaclientcore_snapshot(
     ): Int
@@ -820,7 +824,7 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_build_end_conference_payload(`ptr`: Long,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
-    external fun uniffi_nova_core_fn_method_novaclientcore_build_join_payload(`ptr`: Long,`displayName`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,`token`: RustBuffer.ByValue,`audioMuted`: Byte,`videoMuted`: Byte,uniffi_out_err: Pointer, 
+    external fun uniffi_nova_core_fn_method_novaclientcore_build_join_payload(`ptr`: Long,`displayName`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,`token`: RustBuffer.ByValue,`audioMuted`: Byte,`videoMuted`: Byte,`visitor`: Byte,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_build_lobby_decision_payload(`ptr`: Long,`peerId`: RustBuffer.ByValue,`admit`: Byte,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
@@ -850,7 +854,11 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_derive_e2ee_key_b64(`ptr`: Long,`passphrase`: RustBuffer.ByValue,`generation`: Int,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
+    external fun uniffi_nova_core_fn_method_novaclientcore_hide_dialog(`ptr`: Long,uniffi_out_err: Pointer, 
+    ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_parse_meeting_url(`ptr`: Long,`rawUrl`: RustBuffer.ByValue,uniffi_out_err: Pointer, 
+    ): RustBuffer.ByValue
+    external fun uniffi_nova_core_fn_method_novaclientcore_set_pip_mode(`ptr`: Long,`enabled`: Byte,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
     external fun uniffi_nova_core_fn_method_novaclientcore_snapshot(`ptr`: Long,uniffi_out_err: Pointer, 
     ): RustBuffer.ByValue
@@ -998,7 +1006,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_end_conference_payload() and 0xFFFF) != 20576) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_join_payload() and 0xFFFF) != 10872) {
+    if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_join_payload() and 0xFFFF) != 35426) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_nova_core_checksum_method_novaclientcore_build_lobby_decision_payload() and 0xFFFF) != 12019) {
@@ -1043,7 +1051,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_nova_core_checksum_method_novaclientcore_derive_e2ee_key_b64() and 0xFFFF) != 20054) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_nova_core_checksum_method_novaclientcore_hide_dialog() and 0xFFFF) != 7446) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_nova_core_checksum_method_novaclientcore_parse_meeting_url() and 0xFFFF) != 5955) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_nova_core_checksum_method_novaclientcore_set_pip_mode() and 0xFFFF) != 3801) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_nova_core_checksum_method_novaclientcore_snapshot() and 0xFFFF) != 24139) {
@@ -1515,7 +1529,7 @@ public interface NovaClientCoreInterface {
     
     fun `buildEndConferencePayload`(): kotlin.String
     
-    fun `buildJoinPayload`(`displayName`: kotlin.String, `password`: kotlin.String?, `token`: kotlin.String?, `audioMuted`: kotlin.Boolean, `videoMuted`: kotlin.Boolean): kotlin.String
+    fun `buildJoinPayload`(`displayName`: kotlin.String, `password`: kotlin.String?, `token`: kotlin.String?, `audioMuted`: kotlin.Boolean, `videoMuted`: kotlin.Boolean, `visitor`: kotlin.Boolean): kotlin.String
     
     fun `buildLobbyDecisionPayload`(`peerId`: kotlin.String, `admit`: kotlin.Boolean): kotlin.String
     
@@ -1545,7 +1559,11 @@ public interface NovaClientCoreInterface {
     
     fun `deriveE2eeKeyB64`(`passphrase`: kotlin.String, `generation`: kotlin.UInt): kotlin.String
     
+    fun `hideDialog`(): NovaRoomSnapshot
+    
     fun `parseMeetingUrl`(`rawUrl`: kotlin.String): NovaParsedMeetingUrl
+    
+    fun `setPipMode`(`enabled`: kotlin.Boolean): NovaRoomSnapshot
     
     fun `snapshot`(): NovaRoomSnapshot
     
@@ -1746,7 +1764,7 @@ open class NovaClientCore: Disposable, AutoCloseable, NovaClientCoreInterface
     
 
     
-    @Throws(NovaCoreException::class)override fun `buildJoinPayload`(`displayName`: kotlin.String, `password`: kotlin.String?, `token`: kotlin.String?, `audioMuted`: kotlin.Boolean, `videoMuted`: kotlin.Boolean): kotlin.String {
+    @Throws(NovaCoreException::class)override fun `buildJoinPayload`(`displayName`: kotlin.String, `password`: kotlin.String?, `token`: kotlin.String?, `audioMuted`: kotlin.Boolean, `videoMuted`: kotlin.Boolean, `visitor`: kotlin.Boolean): kotlin.String {
             return FfiConverterString.lift(
     callWithHandle {
     uniffiRustCallWithError(NovaCoreException) { _status ->
@@ -1757,7 +1775,8 @@ open class NovaClientCore: Disposable, AutoCloseable, NovaClientCoreInterface
         FfiConverterOptionalString.lower(`password`),
         FfiConverterOptionalString.lower(`token`),
         FfiConverterBoolean.lower(`audioMuted`),
-        FfiConverterBoolean.lower(`videoMuted`),_status)
+        FfiConverterBoolean.lower(`videoMuted`),
+        FfiConverterBoolean.lower(`visitor`),_status)
 }
     }
     )
@@ -1990,6 +2009,19 @@ open class NovaClientCore: Disposable, AutoCloseable, NovaClientCoreInterface
     }
     
 
+    override fun `hideDialog`(): NovaRoomSnapshot {
+            return FfiConverterTypeNovaRoomSnapshot.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_nova_core_fn_method_novaclientcore_hide_dialog(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
     
     @Throws(NovaCoreException::class)override fun `parseMeetingUrl`(`rawUrl`: kotlin.String): NovaParsedMeetingUrl {
             return FfiConverterTypeNovaParsedMeetingUrl.lift(
@@ -1999,6 +2031,20 @@ open class NovaClientCore: Disposable, AutoCloseable, NovaClientCoreInterface
         it,
         
         FfiConverterString.lower(`rawUrl`),_status)
+}
+    }
+    )
+    }
+    
+
+    override fun `setPipMode`(`enabled`: kotlin.Boolean): NovaRoomSnapshot {
+            return FfiConverterTypeNovaRoomSnapshot.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_nova_core_fn_method_novaclientcore_set_pip_mode(
+        it,
+        
+        FfiConverterBoolean.lower(`enabled`),_status)
 }
     }
     )
@@ -2205,6 +2251,8 @@ data class NovaParsedMeetingUrl (
     var `room`: kotlin.String
     , 
     var `token`: kotlin.String?
+    , 
+    var `visitor`: kotlin.Boolean
     
 ){
     
@@ -2225,6 +2273,7 @@ public object FfiConverterTypeNovaParsedMeetingUrl: FfiConverterRustBuffer<NovaP
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -2232,7 +2281,8 @@ public object FfiConverterTypeNovaParsedMeetingUrl: FfiConverterRustBuffer<NovaP
             FfiConverterString.allocationSize(value.`wsUrl`) +
             FfiConverterString.allocationSize(value.`httpOrigin`) +
             FfiConverterString.allocationSize(value.`room`) +
-            FfiConverterOptionalString.allocationSize(value.`token`)
+            FfiConverterOptionalString.allocationSize(value.`token`) +
+            FfiConverterBoolean.allocationSize(value.`visitor`)
     )
 
     override fun write(value: NovaParsedMeetingUrl, buf: ByteBuffer) {
@@ -2240,6 +2290,7 @@ public object FfiConverterTypeNovaParsedMeetingUrl: FfiConverterRustBuffer<NovaP
             FfiConverterString.write(value.`httpOrigin`, buf)
             FfiConverterString.write(value.`room`, buf)
             FfiConverterOptionalString.write(value.`token`, buf)
+            FfiConverterBoolean.write(value.`visitor`, buf)
     }
 }
 
@@ -2265,6 +2316,8 @@ data class NovaParticipant (
     var `breakoutId`: kotlin.String?
     , 
     var `speakingMs`: kotlin.ULong
+    , 
+    var `isVisitor`: kotlin.Boolean
     
 ){
     
@@ -2291,6 +2344,7 @@ public object FfiConverterTypeNovaParticipant: FfiConverterRustBuffer<NovaPartic
             FfiConverterFloat.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterULong.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -2304,7 +2358,8 @@ public object FfiConverterTypeNovaParticipant: FfiConverterRustBuffer<NovaPartic
             FfiConverterBoolean.allocationSize(value.`handRaised`) +
             FfiConverterFloat.allocationSize(value.`audioLevel`) +
             FfiConverterOptionalString.allocationSize(value.`breakoutId`) +
-            FfiConverterULong.allocationSize(value.`speakingMs`)
+            FfiConverterULong.allocationSize(value.`speakingMs`) +
+            FfiConverterBoolean.allocationSize(value.`isVisitor`)
     )
 
     override fun write(value: NovaParticipant, buf: ByteBuffer) {
@@ -2318,6 +2373,7 @@ public object FfiConverterTypeNovaParticipant: FfiConverterRustBuffer<NovaPartic
             FfiConverterFloat.write(value.`audioLevel`, buf)
             FfiConverterOptionalString.write(value.`breakoutId`, buf)
             FfiConverterULong.write(value.`speakingMs`, buf)
+            FfiConverterBoolean.write(value.`isVisitor`, buf)
     }
 }
 
@@ -2474,6 +2530,14 @@ data class NovaRoomSnapshot (
     , 
     var `isModerator`: kotlin.Boolean
     , 
+    var `isVisitor`: kotlin.Boolean
+    , 
+    var `activeDialog`: NovaDialog?
+    , 
+    var `inPipMode`: kotlin.Boolean
+    , 
+    var `showVisitorJoinDialog`: kotlin.Boolean
+    , 
     var `inLobby`: kotlin.Boolean
     , 
     var `lobbyMessage`: kotlin.String?
@@ -2521,6 +2585,10 @@ public object FfiConverterTypeNovaRoomSnapshot: FfiConverterRustBuffer<NovaRoomS
             FfiConverterString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterOptionalTypeNovaDialog.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -2541,6 +2609,10 @@ public object FfiConverterTypeNovaRoomSnapshot: FfiConverterRustBuffer<NovaRoomS
             FfiConverterOptionalString.allocationSize(value.`selfId`) +
             FfiConverterString.allocationSize(value.`room`) +
             FfiConverterBoolean.allocationSize(value.`isModerator`) +
+            FfiConverterBoolean.allocationSize(value.`isVisitor`) +
+            FfiConverterOptionalTypeNovaDialog.allocationSize(value.`activeDialog`) +
+            FfiConverterBoolean.allocationSize(value.`inPipMode`) +
+            FfiConverterBoolean.allocationSize(value.`showVisitorJoinDialog`) +
             FfiConverterBoolean.allocationSize(value.`inLobby`) +
             FfiConverterOptionalString.allocationSize(value.`lobbyMessage`) +
             FfiConverterOptionalString.allocationSize(value.`rejectedReason`) +
@@ -2561,6 +2633,10 @@ public object FfiConverterTypeNovaRoomSnapshot: FfiConverterRustBuffer<NovaRoomS
             FfiConverterOptionalString.write(value.`selfId`, buf)
             FfiConverterString.write(value.`room`, buf)
             FfiConverterBoolean.write(value.`isModerator`, buf)
+            FfiConverterBoolean.write(value.`isVisitor`, buf)
+            FfiConverterOptionalTypeNovaDialog.write(value.`activeDialog`, buf)
+            FfiConverterBoolean.write(value.`inPipMode`, buf)
+            FfiConverterBoolean.write(value.`showVisitorJoinDialog`, buf)
             FfiConverterBoolean.write(value.`inLobby`, buf)
             FfiConverterOptionalString.write(value.`lobbyMessage`, buf)
             FfiConverterOptionalString.write(value.`rejectedReason`, buf)
@@ -2723,6 +2799,39 @@ public object FfiConverterTypeNovaCoreError : FfiConverterRustBuffer<NovaCoreExc
 
 
 
+enum class NovaDialog {
+    
+    VISITOR_JOIN_MEETING;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeNovaDialog: FfiConverterRustBuffer<NovaDialog> {
+    override fun read(buf: ByteBuffer) = try {
+        NovaDialog.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: NovaDialog) = 4UL
+
+    override fun write(value: NovaDialog, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
 /**
  * @suppress
  */
@@ -2780,6 +2889,38 @@ public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?>
         } else {
             buf.put(1)
             FfiConverterString.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeNovaDialog: FfiConverterRustBuffer<NovaDialog?> {
+    override fun read(buf: ByteBuffer): NovaDialog? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeNovaDialog.read(buf)
+    }
+
+    override fun allocationSize(value: NovaDialog?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeNovaDialog.allocationSize(value)
+        }
+    }
+
+    override fun write(value: NovaDialog?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeNovaDialog.write(value, buf)
         }
     }
 }

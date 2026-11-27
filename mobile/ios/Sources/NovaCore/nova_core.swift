@@ -652,7 +652,7 @@ public protocol NovaClientCoreProtocol: AnyObject, Sendable {
     
     func buildEndConferencePayload() throws  -> String
     
-    func buildJoinPayload(displayName: String, password: String?, token: String?, audioMuted: Bool, videoMuted: Bool) throws  -> String
+    func buildJoinPayload(displayName: String, password: String?, token: String?, audioMuted: Bool, videoMuted: Bool, visitor: Bool) throws  -> String
     
     func buildLobbyDecisionPayload(peerId: String, admit: Bool) throws  -> String
     
@@ -682,7 +682,11 @@ public protocol NovaClientCoreProtocol: AnyObject, Sendable {
     
     func deriveE2eeKeyB64(passphrase: String, generation: UInt32) throws  -> String
     
+    func hideDialog()  -> NovaRoomSnapshot
+    
     func parseMeetingUrl(rawUrl: String) throws  -> NovaParsedMeetingUrl
+    
+    func setPipMode(enabled: Bool)  -> NovaRoomSnapshot
     
     func snapshot()  -> NovaRoomSnapshot
     
@@ -802,7 +806,7 @@ open func buildEndConferencePayload()throws  -> String  {
 })
 }
     
-open func buildJoinPayload(displayName: String, password: String?, token: String?, audioMuted: Bool, videoMuted: Bool)throws  -> String  {
+open func buildJoinPayload(displayName: String, password: String?, token: String?, audioMuted: Bool, videoMuted: Bool, visitor: Bool)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeNovaCoreError_lift) {
         uniffiCallStatus in
     uniffi_nova_core_fn_method_novaclientcore_build_join_payload(
@@ -811,7 +815,8 @@ open func buildJoinPayload(displayName: String, password: String?, token: String
         FfiConverterOptionString.lower(password),
         FfiConverterOptionString.lower(token),
         FfiConverterBool.lower(audioMuted),
-        FfiConverterBool.lower(videoMuted),uniffiCallStatus
+        FfiConverterBool.lower(videoMuted),
+        FfiConverterBool.lower(visitor),uniffiCallStatus
     )
 })
 }
@@ -972,12 +977,31 @@ open func deriveE2eeKeyB64(passphrase: String, generation: UInt32)throws  -> Str
 })
 }
     
+open func hideDialog() -> NovaRoomSnapshot  {
+    return try!  FfiConverterTypeNovaRoomSnapshot_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_nova_core_fn_method_novaclientcore_hide_dialog(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
 open func parseMeetingUrl(rawUrl: String)throws  -> NovaParsedMeetingUrl  {
     return try  FfiConverterTypeNovaParsedMeetingUrl_lift(try rustCallWithError(FfiConverterTypeNovaCoreError_lift) {
         uniffiCallStatus in
     uniffi_nova_core_fn_method_novaclientcore_parse_meeting_url(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(rawUrl),uniffiCallStatus
+    )
+})
+}
+    
+open func setPipMode(enabled: Bool) -> NovaRoomSnapshot  {
+    return try!  FfiConverterTypeNovaRoomSnapshot_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_nova_core_fn_method_novaclientcore_set_pip_mode(
+            self.uniffiCloneHandle(),
+        FfiConverterBool.lower(enabled),uniffiCallStatus
     )
 })
 }
@@ -1226,14 +1250,16 @@ public struct NovaParsedMeetingUrl: Equatable, Hashable {
     public var httpOrigin: String
     public var room: String
     public var token: String?
+    public var visitor: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(wsUrl: String, httpOrigin: String, room: String, token: String?) {
+    public init(wsUrl: String, httpOrigin: String, room: String, token: String?, visitor: Bool) {
         self.wsUrl = wsUrl
         self.httpOrigin = httpOrigin
         self.room = room
         self.token = token
+        self.visitor = visitor
     }
 
     
@@ -1255,7 +1281,8 @@ public struct FfiConverterTypeNovaParsedMeetingUrl: FfiConverterRustBuffer {
                 wsUrl: FfiConverterString.read(from: &buf), 
                 httpOrigin: FfiConverterString.read(from: &buf), 
                 room: FfiConverterString.read(from: &buf), 
-                token: FfiConverterOptionString.read(from: &buf)
+                token: FfiConverterOptionString.read(from: &buf), 
+                visitor: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -1264,6 +1291,7 @@ public struct FfiConverterTypeNovaParsedMeetingUrl: FfiConverterRustBuffer {
         FfiConverterString.write(value.httpOrigin, into: &buf)
         FfiConverterString.write(value.room, into: &buf)
         FfiConverterOptionString.write(value.token, into: &buf)
+        FfiConverterBool.write(value.visitor, into: &buf)
     }
 }
 
@@ -1294,10 +1322,11 @@ public struct NovaParticipant: Equatable, Hashable {
     public var audioLevel: Float
     public var breakoutId: String?
     public var speakingMs: UInt64
+    public var isVisitor: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, displayName: String, isModerator: Bool, audioMuted: Bool, videoMuted: Bool, screenSharing: Bool, handRaised: Bool, audioLevel: Float, breakoutId: String?, speakingMs: UInt64) {
+    public init(id: String, displayName: String, isModerator: Bool, audioMuted: Bool, videoMuted: Bool, screenSharing: Bool, handRaised: Bool, audioLevel: Float, breakoutId: String?, speakingMs: UInt64, isVisitor: Bool) {
         self.id = id
         self.displayName = displayName
         self.isModerator = isModerator
@@ -1308,6 +1337,7 @@ public struct NovaParticipant: Equatable, Hashable {
         self.audioLevel = audioLevel
         self.breakoutId = breakoutId
         self.speakingMs = speakingMs
+        self.isVisitor = isVisitor
     }
 
     
@@ -1335,7 +1365,8 @@ public struct FfiConverterTypeNovaParticipant: FfiConverterRustBuffer {
                 handRaised: FfiConverterBool.read(from: &buf), 
                 audioLevel: FfiConverterFloat.read(from: &buf), 
                 breakoutId: FfiConverterOptionString.read(from: &buf), 
-                speakingMs: FfiConverterUInt64.read(from: &buf)
+                speakingMs: FfiConverterUInt64.read(from: &buf), 
+                isVisitor: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -1350,6 +1381,7 @@ public struct FfiConverterTypeNovaParticipant: FfiConverterRustBuffer {
         FfiConverterFloat.write(value.audioLevel, into: &buf)
         FfiConverterOptionString.write(value.breakoutId, into: &buf)
         FfiConverterUInt64.write(value.speakingMs, into: &buf)
+        FfiConverterBool.write(value.isVisitor, into: &buf)
     }
 }
 
@@ -1559,6 +1591,10 @@ public struct NovaRoomSnapshot: Equatable, Hashable {
     public var selfId: String?
     public var room: String
     public var isModerator: Bool
+    public var isVisitor: Bool
+    public var activeDialog: NovaDialog?
+    public var inPipMode: Bool
+    public var showVisitorJoinDialog: Bool
     public var inLobby: Bool
     public var lobbyMessage: String?
     public var rejectedReason: String?
@@ -1576,10 +1612,14 @@ public struct NovaRoomSnapshot: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(selfId: String?, room: String, isModerator: Bool, inLobby: Bool, lobbyMessage: String?, rejectedReason: String?, lastError: String?, activeSpeakerId: String?, participants: [NovaParticipant], lobby: [NovaLobbyEntry], messages: [NovaChatMessage], polls: [NovaPoll], breakouts: [NovaBreakoutRoom], security: NovaRoomSecurity, sdpAnswer: String?, pendingRenegotiateSdp: String?, trackOwners: [NovaTrackOwner]) {
+    public init(selfId: String?, room: String, isModerator: Bool, isVisitor: Bool, activeDialog: NovaDialog?, inPipMode: Bool, showVisitorJoinDialog: Bool, inLobby: Bool, lobbyMessage: String?, rejectedReason: String?, lastError: String?, activeSpeakerId: String?, participants: [NovaParticipant], lobby: [NovaLobbyEntry], messages: [NovaChatMessage], polls: [NovaPoll], breakouts: [NovaBreakoutRoom], security: NovaRoomSecurity, sdpAnswer: String?, pendingRenegotiateSdp: String?, trackOwners: [NovaTrackOwner]) {
         self.selfId = selfId
         self.room = room
         self.isModerator = isModerator
+        self.isVisitor = isVisitor
+        self.activeDialog = activeDialog
+        self.inPipMode = inPipMode
+        self.showVisitorJoinDialog = showVisitorJoinDialog
         self.inLobby = inLobby
         self.lobbyMessage = lobbyMessage
         self.rejectedReason = rejectedReason
@@ -1615,6 +1655,10 @@ public struct FfiConverterTypeNovaRoomSnapshot: FfiConverterRustBuffer {
                 selfId: FfiConverterOptionString.read(from: &buf), 
                 room: FfiConverterString.read(from: &buf), 
                 isModerator: FfiConverterBool.read(from: &buf), 
+                isVisitor: FfiConverterBool.read(from: &buf), 
+                activeDialog: FfiConverterOptionTypeNovaDialog.read(from: &buf), 
+                inPipMode: FfiConverterBool.read(from: &buf), 
+                showVisitorJoinDialog: FfiConverterBool.read(from: &buf), 
                 inLobby: FfiConverterBool.read(from: &buf), 
                 lobbyMessage: FfiConverterOptionString.read(from: &buf), 
                 rejectedReason: FfiConverterOptionString.read(from: &buf), 
@@ -1636,6 +1680,10 @@ public struct FfiConverterTypeNovaRoomSnapshot: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.selfId, into: &buf)
         FfiConverterString.write(value.room, into: &buf)
         FfiConverterBool.write(value.isModerator, into: &buf)
+        FfiConverterBool.write(value.isVisitor, into: &buf)
+        FfiConverterOptionTypeNovaDialog.write(value.activeDialog, into: &buf)
+        FfiConverterBool.write(value.inPipMode, into: &buf)
+        FfiConverterBool.write(value.showVisitorJoinDialog, into: &buf)
         FfiConverterBool.write(value.inLobby, into: &buf)
         FfiConverterOptionString.write(value.lobbyMessage, into: &buf)
         FfiConverterOptionString.write(value.rejectedReason, into: &buf)
@@ -1817,6 +1865,65 @@ public func FfiConverterTypeNovaCoreError_lift(_ buf: RustBuffer) throws -> Nova
     return FfiConverterTypeNovaCoreError.lower(value)
 }
 
+
+
+public enum NovaDialog: Equatable, Hashable {
+    
+    case visitorJoinMeeting
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension NovaDialog: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeNovaDialog: FfiConverterRustBuffer {
+    typealias SwiftType = NovaDialog
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NovaDialog {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .visitorJoinMeeting
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: NovaDialog, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .visitorJoinMeeting:
+            writeInt(&buf, Int32(1))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeNovaDialog_lift(_ buf: RustBuffer) throws -> NovaDialog {
+    return try FfiConverterTypeNovaDialog.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+@Sendable public func FfiConverterTypeNovaDialog_lower(_ value: NovaDialog) -> RustBuffer {
+    return FfiConverterTypeNovaDialog.lower(value)
+}
+
+
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
@@ -1860,6 +1967,30 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterString.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeNovaDialog: FfiConverterRustBuffer {
+    typealias SwiftType = NovaDialog?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeNovaDialog.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeNovaDialog.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -2123,7 +2254,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_nova_core_checksum_method_novaclientcore_build_end_conference_payload() != 20576) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_nova_core_checksum_method_novaclientcore_build_join_payload() != 10872) {
+    if (uniffi_nova_core_checksum_method_novaclientcore_build_join_payload() != 35426) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_nova_core_checksum_method_novaclientcore_build_lobby_decision_payload() != 12019) {
@@ -2168,7 +2299,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_nova_core_checksum_method_novaclientcore_derive_e2ee_key_b64() != 20054) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_nova_core_checksum_method_novaclientcore_hide_dialog() != 7446) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_nova_core_checksum_method_novaclientcore_parse_meeting_url() != 5955) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_nova_core_checksum_method_novaclientcore_set_pip_mode() != 3801) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_nova_core_checksum_method_novaclientcore_snapshot() != 24139) {

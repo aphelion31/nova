@@ -50,9 +50,18 @@ fun ParticipantsSheet(controller: NovaClientController, onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(if (peer.isModerator) "${peer.displayName} (Host)" else peer.displayName)
+                    Text(
+                        when {
+                            peer.isModerator -> "${peer.displayName} (Host)"
+                            peer.isVisitor -> "${peer.displayName} (Viewer)"
+                            else -> peer.displayName
+                        }
+                    )
                     if (snapshot.isModerator && peer.id != snapshot.selfId) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (peer.isVisitor) {
+                                Button(onClick = { controller.moderate(peer.id, "promote_visitor") }) { Text("Promote") }
+                            }
                             OutlinedButton(onClick = { controller.moderate(peer.id, "mute_audio") }) { Text("Mute") }
                             OutlinedButton(onClick = { controller.moderate(peer.id, "kick") }) { Text("Kick") }
                         }

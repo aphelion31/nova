@@ -93,6 +93,21 @@ fun PrejoinScreen(controller: NovaClientController, initialUrl: String) {
             ) {
                 Text("Join Audio-Only")
             }
+
+            OutlinedButton(
+                onClick = {
+                    controller.join(
+                        meetingUrl,
+                        displayName,
+                        password,
+                        audioOnlyMode = true,
+                        joinAsVisitor = true
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Join as Viewer")
+            }
         }
     }
 }

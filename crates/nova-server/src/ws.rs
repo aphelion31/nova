@@ -84,6 +84,7 @@ async fn handle_socket(socket: WebSocket, room: String, is_host: bool, st: WsSta
                         video_muted,
                         email,
                         avatar_url,
+                        visitor,
                     } => {
                         if joined {
                             continue;
@@ -101,6 +102,7 @@ async fn handle_socket(socket: WebSocket, room: String, is_host: bool, st: WsSta
                                 email,
                                 avatar_url,
                                 is_host,
+                                visitor,
                                 tx.clone(),
                             )
                             .await

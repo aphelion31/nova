@@ -117,15 +117,23 @@ class NovaClientController(
             .apply()
     }
 
-    fun join(meetingUrl: String, displayName: String, password: String?, audioOnlyMode: Boolean = false) {
+    fun join(
+        meetingUrl: String,
+        displayName: String,
+        password: String?,
+        audioOnlyMode: Boolean = false,
+        joinAsVisitor: Boolean = false
+    ) {
         runCatching {
             val parsed = parseNovaMeetingUrl(meetingUrl)
             core = NovaClientCore(parsed.room)
             _snapshot.value = core.snapshot()
             initialOfferSent = false
             _displayName.value = displayName
+            val isVisitor = joinAsVisitor || parsed.visitor
             _audioOnly.value = audioOnlyMode
-            if (audioOnlyMode) _videoMuted.value = true
+            if (audioOnlyMode || isVisitor) _videoMuted.value = true
+            if (isVisitor) _audioMuted.value = true
             _error.value = null
             saveSettings(_serverBaseUrl.value, displayName, _startMuted.value)
             recordRecent(parsed.room, meetingUrl)
@@ -135,7 +143,8 @@ class NovaClientController(
                 password = password?.ifBlank { null },
                 token = parsed.token,
                 audioMuted = _audioMuted.value,
-                videoMuted = _videoMuted.value
+                videoMuted = _videoMuted.value,
+                visitor = isVisitor
             )
 
             context.startForegroundService(Intent(context, CallForegroundService::class.java))
@@ -170,6 +179,12 @@ class NovaClientController(
                                     }
                                     "mute_video" -> {
                                         _videoMuted.value = true
+                                        rtcAdapter?.setVideoMuted(true)
+                                    }
+                                    "demote_visitor" -> {
+                                        _audioMuted.value = true
+                                        _videoMuted.value = true
+                                        rtcAdapter?.setAudioMuted(true)
                                         rtcAdapter?.setVideoMuted(true)
                                     }
                                     "kick" -> {
@@ -309,6 +324,14 @@ class NovaClientController(
 
     fun deriveE2eeKey(passphrase: String): String? =
         runCatching { core.deriveE2eeKeyB64(passphrase, 1u) }.getOrNull()
+
+    fun hideDialog() {
+        _snapshot.value = core.hideDialog()
+    }
+
+    fun setPipMode(enabled: Boolean) {
+        _snapshot.value = core.setPipMode(enabled)
+    }
 
     fun leave() {
         ws?.close(1000, "User left")

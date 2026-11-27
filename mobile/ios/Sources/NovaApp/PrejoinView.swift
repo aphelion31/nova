@@ -78,6 +78,18 @@ struct PrejoinView: View {
                 }
                 .buttonStyle(.bordered)
                 .frame(maxWidth: .infinity)
+
+                Button("Join as Viewer") {
+                    bridge.join(
+                        meetingUrl: meetingUrl,
+                        displayName: displayName,
+                        password: password.isEmpty ? nil : password,
+                        audioOnlyMode: true,
+                        joinAsVisitor: true
+                    )
+                }
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
             }
             Spacer()
         }

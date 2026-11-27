@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { Clock, Star } from "lucide-react";
+import { Clock, Hand, Star } from "lucide-react";
 import { ChatDrawer, type ChatTab } from "~/components/ChatDrawer";
 import { ConferenceHeader } from "~/components/ConferenceHeader";
 import { ControlDock } from "~/components/ControlDock";
@@ -119,6 +119,7 @@ export default function RoomRoute({ embedMode = false }: { embedMode?: boolean }
 
   const initialName = searchParams.get("name") || "";
   const jwtToken = searchParams.get("jwt") || undefined;
+  const joinAsVisitor = searchParams.get("visitor") === "true" || searchParams.get("visitor") === "1";
 
   const pushToast = useCallback((toast: Omit<ToastItem, "id">, ttlMs = 4500) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -296,6 +297,7 @@ export default function RoomRoute({ embedMode = false }: { embedMode?: boolean }
         audioMuted: opts.audioMuted,
         videoMuted: opts.videoMuted,
         localStream: activeStream,
+        visitor: joinAsVisitor,
       });
       setPhase("active");
       emitExternalEvent(roomName, "videoConferenceJoined", {
@@ -303,7 +305,7 @@ export default function RoomRoute({ embedMode = false }: { embedMode?: boolean }
         displayName: opts.displayName,
       });
     },
-    [forceUpdate, handleLeave, jwtToken, pushToast, roomName, talkWhileMutedEnabled],
+    [forceUpdate, handleLeave, joinAsVisitor, jwtToken, pushToast, roomName, talkWhileMutedEnabled],
   );
 
   // Auto-join in embed mode
@@ -334,8 +336,16 @@ export default function RoomRoute({ embedMode = false }: { embedMode?: boolean }
 
   useEffect(() => {
     const onFs = () => setFullscreen(Boolean(document.fullscreenElement));
+    const onEnterPip = () => sessionRef.current?.setPipMode(true);
+    const onLeavePip = () => sessionRef.current?.setPipMode(false);
     document.addEventListener("fullscreenchange", onFs);
-    return () => document.removeEventListener("fullscreenchange", onFs);
+    document.addEventListener("enterpictureinpicture", onEnterPip, true);
+    document.addEventListener("leavepictureinpicture", onLeavePip, true);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      document.removeEventListener("enterpictureinpicture", onEnterPip, true);
+      document.removeEventListener("leavepictureinpicture", onLeavePip, true);
+    };
   }, []);
 
   useEffect(() => {
@@ -909,6 +919,40 @@ export default function RoomRoute({ embedMode = false }: { embedMode?: boolean }
         toasts={toasts}
         onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
       />
+
+      {session?.showVisitorJoinDialog ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Joining meeting"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+        >
+          <div className="w-full max-w-sm rounded-[8px] border border-[#292929] bg-[#141414] p-6 text-white shadow-2xl">
+            <h2 className="text-base font-semibold">Joining meeting</h2>
+            <p className="mt-3 text-sm text-[#C2C2C2]">You&apos;re currently a viewer in this conference.</p>
+            <div className="my-4 flex flex-col items-center gap-2">
+              <span className="rounded border border-[#3D3D3D] px-3 py-1 text-xs text-[#C2C2C2]">
+                Raise your hand
+              </span>
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-[6px] bg-[#292929] text-white">
+                <Hand className="h-5 w-5" />
+              </span>
+            </div>
+            <p className="text-sm text-[#C2C2C2]">
+              If you wish to speak, please raise your hand below and wait for the moderator&apos;s approval.
+            </p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => session.hideDialog()}
+                className="rounded-[6px] bg-[#246FE5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4687ED]"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {whiteboardOpen && session ? (
         <WhiteboardModal

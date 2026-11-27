@@ -145,6 +145,7 @@ impl RoomRegistry {
         email: Option<String>,
         avatar_url: Option<String>,
         is_authenticated_host: bool,
+        visitor: bool,
         tx: mpsc::UnboundedSender<ServerMessage>,
     ) -> Result<(), (String, String)> {
         let room_arc = self
@@ -170,6 +171,17 @@ impl RoomRegistry {
                         .unwrap_or(false)
             })
             .unwrap_or(false);
+        let jwt_visitor = jwt_claims
+            .as_ref()
+            .map(|c| {
+                c.visitor.unwrap_or(false)
+                    || c.context
+                        .as_ref()
+                        .and_then(|ctx| ctx.user.as_ref())
+                        .and_then(|u| u.visitor)
+                        .unwrap_or(false)
+            })
+            .unwrap_or(false);
 
         let now = Utc::now().timestamp();
         let clean_name = if display_name.trim().is_empty() {
@@ -185,8 +197,10 @@ impl RoomRegistry {
 
         let mut room = room_arc.write().await;
 
-        let first_in_room = room.peers.is_empty();
-        let is_moderator = first_in_room || is_authenticated_host || jwt_moderator;
+        let requested_visitor = (visitor || jwt_visitor) && !is_authenticated_host && !jwt_moderator;
+        let first_non_visitor = !room.peers.values().any(|p| !p.participant.is_visitor);
+        let is_moderator = !requested_visitor && (first_non_visitor || is_authenticated_host || jwt_moderator);
+        let is_visitor = requested_visitor;
 
         if room.security.locked && !is_moderator {
             let Some(expected_hash) = room.password_hash.as_deref() else {
@@ -200,8 +214,8 @@ impl RoomRegistry {
             }
         }
 
-        let eff_audio_muted = audio_muted || (!is_moderator && room.security.start_audio_muted);
-        let eff_video_muted = video_muted || (!is_moderator && room.security.start_video_muted);
+        let eff_audio_muted = is_visitor || audio_muted || (!is_moderator && room.security.start_audio_muted);
+        let eff_video_muted = is_visitor || video_muted || (!is_moderator && room.security.start_video_muted);
 
         let participant = Participant {
             id: peer_id.clone(),
@@ -223,6 +237,7 @@ impl RoomRegistry {
             breakout_id: None,
             joined_at: now,
             speaking_ms: 0,
+            is_visitor,
         };
 
         let conn = PeerConn {
@@ -289,6 +304,7 @@ impl RoomRegistry {
             shared_video: room.shared_video.clone(),
             follow_me: room.follow_me.clone(),
             files: room.files.clone(),
+            is_visitor: joined_participant.is_visitor,
         });
 
         for other in room.peers.values() {
@@ -356,12 +372,19 @@ impl RoomRegistry {
             } => {
                 let mut room = room_arc.write().await;
                 if let Some(peer) = room.peers.get_mut(peer_id) {
-                    peer.participant.audio_muted = audio_muted;
-                    peer.participant.video_muted = video_muted;
-                    peer.participant.screen_sharing = screen_sharing;
-                    peer.participant.audio_level = audio_level.clamp(0.0, 1.0);
-                    if !audio_muted && audio_level > 0.08 {
-                        peer.participant.speaking_ms = peer.participant.speaking_ms.saturating_add(500);
+                    if peer.participant.is_visitor {
+                        peer.participant.audio_muted = true;
+                        peer.participant.video_muted = true;
+                        peer.participant.screen_sharing = false;
+                        peer.participant.audio_level = 0.0;
+                    } else {
+                        peer.participant.audio_muted = audio_muted;
+                        peer.participant.video_muted = video_muted;
+                        peer.participant.screen_sharing = screen_sharing;
+                        peer.participant.audio_level = audio_level.clamp(0.0, 1.0);
+                        if !audio_muted && audio_level > 0.08 {
+                            peer.participant.speaking_ms = peer.participant.speaking_ms.saturating_add(500);
+                        }
                     }
                     let updated = peer.participant.clone();
                     broadcast_all(&room, ServerMessage::ParticipantUpdated { participant: updated });
@@ -720,8 +743,36 @@ impl RoomRegistry {
                         ModerationAction::GrantModerator => {
                             if let Some(target) = room.peers.get_mut(&target_id) {
                                 target.participant.is_moderator = true;
+                                target.participant.is_visitor = false;
                                 let _ = target.tx.send(ServerMessage::Moderated {
                                     action: ModerationAction::GrantModerator,
+                                    by_name: actor_name,
+                                });
+                                let updated = target.participant.clone();
+                                broadcast_all(&room, ServerMessage::ParticipantUpdated { participant: updated });
+                            }
+                        }
+                        ModerationAction::PromoteVisitor => {
+                            if let Some(target) = room.peers.get_mut(&target_id) {
+                                target.participant.is_visitor = false;
+                                target.participant.hand_raised = false;
+                                let _ = target.tx.send(ServerMessage::Moderated {
+                                    action: ModerationAction::PromoteVisitor,
+                                    by_name: actor_name,
+                                });
+                                let updated = target.participant.clone();
+                                broadcast_all(&room, ServerMessage::ParticipantUpdated { participant: updated });
+                            }
+                        }
+                        ModerationAction::DemoteVisitor => {
+                            if let Some(target) = room.peers.get_mut(&target_id) {
+                                target.participant.is_visitor = true;
+                                target.participant.audio_muted = true;
+                                target.participant.video_muted = true;
+                                target.participant.screen_sharing = false;
+                                target.participant.audio_level = 0.0;
+                                let _ = target.tx.send(ServerMessage::Moderated {
+                                    action: ModerationAction::DemoteVisitor,
                                     by_name: actor_name,
                                 });
                                 let updated = target.participant.clone();
@@ -1003,10 +1054,14 @@ impl RoomRegistry {
                         peer_id: peer_id.to_string(),
                     },
                 );
-                // Promote next participant if no moderators remain.
+                // Promote next non-visitor participant if no moderators remain.
                 if !room.peers.is_empty()
                     && !room.peers.values().any(|p| p.participant.is_moderator)
-                    && let Some(next_id) = room.peers.keys().next().cloned()
+                    && let Some(next_id) = room
+                        .peers
+                        .iter()
+                        .find(|(_, p)| !p.participant.is_visitor)
+                        .map(|(id, _)| id.clone())
                     && let Some(next_peer) = room.peers.get_mut(&next_id)
                 {
                     next_peer.participant.is_moderator = true;
@@ -1032,3 +1087,139 @@ fn broadcast_all(room: &RoomState, msg: ServerMessage) {
 
 #[allow(dead_code)]
 fn _keep_track_meta_imported(_: TrackMeta, _: MediaTrackKind) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn visitor_join_is_forced_muted_and_can_be_promoted() {
+        let pool = db::connect_and_migrate("sqlite::memory:").await.expect("init db");
+        let auth = Arc::new(AuthConfig {
+            session_secret: "test-session-secret".into(),
+            jwt_app_id: "nova-meet".into(),
+            jwt_app_secret: "test-jwt-secret".into(),
+            secure_cookies: false,
+        });
+        let sfu = SfuHandle::spawn("127.0.0.1:0", None).expect("spawn sfu");
+        let registry = RoomRegistry::new(pool, auth, sfu.clone(), vec![]);
+
+        let (host_tx, mut host_rx) = mpsc::unbounded_channel();
+        registry
+            .join_peer(
+                "stage",
+                "host-1".into(),
+                "Host".into(),
+                None,
+                None,
+                false,
+                false,
+                None,
+                None,
+                false,
+                false,
+                host_tx,
+            )
+            .await
+            .expect("host join");
+
+        let host_joined = host_rx.recv().await.expect("host joined msg");
+        assert!(matches!(
+            host_joined,
+            ServerMessage::Joined {
+                is_moderator: true,
+                is_visitor: false,
+                ..
+            }
+        ));
+
+        let (vis_tx, mut vis_rx) = mpsc::unbounded_channel();
+        registry
+            .join_peer(
+                "stage",
+                "vis-1".into(),
+                "Viewer".into(),
+                None,
+                None,
+                false,
+                false,
+                None,
+                None,
+                false,
+                true,
+                vis_tx,
+            )
+            .await
+            .expect("visitor join");
+
+        let vis_joined = vis_rx.recv().await.expect("visitor joined msg");
+        match vis_joined {
+            ServerMessage::Joined {
+                is_moderator,
+                is_visitor,
+                participants,
+                ..
+            } => {
+                assert!(!is_moderator);
+                assert!(is_visitor);
+                let vp = participants
+                    .iter()
+                    .find(|p| p.id == "vis-1")
+                    .expect("visitor in roster");
+                assert!(vp.is_visitor);
+                assert!(vp.audio_muted);
+                assert!(vp.video_muted);
+            }
+            other => panic!("unexpected visitor join message: {other:?}"),
+        }
+
+        // Visitor attempting to unmute via MediaState stays muted.
+        registry
+            .handle_client_message(
+                "stage",
+                "vis-1",
+                ClientMessage::MediaState {
+                    audio_muted: false,
+                    video_muted: false,
+                    screen_sharing: true,
+                    audio_level: 0.9,
+                },
+            )
+            .await;
+        while let Ok(msg) = vis_rx.try_recv() {
+            if let ServerMessage::ParticipantUpdated { participant } = msg
+                && participant.id == "vis-1"
+            {
+                assert!(participant.is_visitor);
+                assert!(participant.audio_muted);
+                assert!(participant.video_muted);
+                assert!(!participant.screen_sharing);
+                assert_eq!(participant.audio_level, 0.0);
+            }
+        }
+
+        // Moderator promotes visitor -> becomes regular participant.
+        registry
+            .handle_client_message(
+                "stage",
+                "host-1",
+                ClientMessage::Moderate {
+                    target_id: "vis-1".into(),
+                    action: ModerationAction::PromoteVisitor,
+                },
+            )
+            .await;
+        let mut saw_promoted = false;
+        while let Ok(msg) = vis_rx.try_recv() {
+            if let ServerMessage::ParticipantUpdated { participant } = msg
+                && participant.id == "vis-1"
+                && !participant.is_visitor
+            {
+                saw_promoted = true;
+            }
+        }
+        assert!(saw_promoted);
+
+        sfu.shutdown();
+    }
+}
