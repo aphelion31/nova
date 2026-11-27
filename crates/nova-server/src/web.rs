@@ -19,7 +19,7 @@ struct WebProbeState {
     db: SqlitePool,
 }
 
-const FAVICON_SVG: &str = include_str!("../../../web/public/brand-assets/favicon.svg");
+const FAVICON_ICO: &[u8] = include_bytes!("../../../web/public/favicon.ico");
 
 pub fn routes(db: SqlitePool, web_dir: PathBuf) -> Router {
     let index_path = web_dir.join("index.html");
@@ -60,7 +60,14 @@ async fn security_headers(req: Request, next: Next) -> Response {
 }
 
 async fn handle_favicon() -> impl IntoResponse {
-    (StatusCode::OK, [(header::CONTENT_TYPE, "image/svg+xml")], FAVICON_SVG)
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "image/x-icon"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        FAVICON_ICO,
+    )
 }
 
 async fn handle_health() -> impl IntoResponse {
