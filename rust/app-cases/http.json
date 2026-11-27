@@ -1,6 +1,6 @@
 {
   "target": "nova",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "recorded_against": "target/release/nova",
   "cases": [
     {
