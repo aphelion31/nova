@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: ./docker/nginx/Dockerfile
-    image: nova-nginx:1.1.0
+    image: nova-nginx:1.1.1
     ports:
       - "127.0.0.1:${NGINX_PORT:-8080}:80"
     read_only: true
@@ -23,7 +23,7 @@ services:
     build:
       context: .
       dockerfile: ./docker/axum/Dockerfile
-    image: nova-axum:1.1.0
+    image: nova-axum:1.1.1
     env_file:
       - path: .env
         required: false
