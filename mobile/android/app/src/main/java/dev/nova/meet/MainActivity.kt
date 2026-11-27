@@ -1,5 +1,6 @@
 package dev.nova.meet
 
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,9 +27,11 @@ private val JitsiDarkColors = darkColorScheme(
 )
 
 class MainActivity : ComponentActivity() {
+    private lateinit var controller: NovaClientController
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val controller = NovaClientController(applicationContext)
+        controller = NovaClientController(applicationContext)
 
         setContent {
             MaterialTheme(colorScheme = JitsiDarkColors) {
@@ -41,6 +44,13 @@ class MainActivity : ComponentActivity() {
                     else -> WelcomeScreen(controller)
                 }
             }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        if (::controller.isInitialized) {
+            controller.setPipMode(isInPictureInPictureMode)
         }
     }
 }

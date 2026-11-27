@@ -44,6 +44,7 @@ async fn serve_config_js(State(st): State<CompatState>, headers: HeaderMap) -> i
         "enableLobbyChat": true,
         "e2ee": { "enabled": true },
         "p2p": { "enabled": false },
+        "visitors": { "showJoinMeetingDialog": true },
         "iceServers": [{ "urls": ice_urls }],
         "testing": { "sfu": "str0m" },
     });

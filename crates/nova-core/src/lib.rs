@@ -3,7 +3,7 @@ pub mod protocol;
 pub mod state;
 
 use crate::protocol::{ClientMessage, ModerationAction, ServerMessage};
-use crate::state::RoomSnapshot;
+use crate::state::{ActiveDialog, RoomSnapshot};
 use std::sync::Mutex;
 use thiserror::Error;
 use url::Url;
@@ -20,12 +20,18 @@ pub enum NovaCoreError {
     Crypto { detail: String },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum NovaDialog {
+    VisitorJoinMeeting,
+}
+
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct NovaParsedMeetingUrl {
     pub ws_url: String,
     pub http_origin: String,
     pub room: String,
     pub token: Option<String>,
+    pub visitor: bool,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -40,6 +46,7 @@ pub struct NovaParticipant {
     pub audio_level: f32,
     pub breakout_id: Option<String>,
     pub speaking_ms: u64,
+    pub is_visitor: bool,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -100,6 +107,10 @@ pub struct NovaRoomSnapshot {
     pub self_id: Option<String>,
     pub room: String,
     pub is_moderator: bool,
+    pub is_visitor: bool,
+    pub active_dialog: Option<NovaDialog>,
+    pub in_pip_mode: bool,
+    pub show_visitor_join_dialog: bool,
     pub in_lobby: bool,
     pub lobby_message: Option<String>,
     pub rejected_reason: Option<String>,
@@ -123,6 +134,12 @@ impl From<&RoomSnapshot> for NovaRoomSnapshot {
             self_id: s.self_id.clone(),
             room: s.room.clone(),
             is_moderator: s.is_moderator,
+            is_visitor: s.is_visitor,
+            active_dialog: s.active_dialog.map(|d| match d {
+                ActiveDialog::VisitorJoinMeeting => NovaDialog::VisitorJoinMeeting,
+            }),
+            in_pip_mode: s.in_pip_mode,
+            show_visitor_join_dialog: s.should_show_visitor_join_dialog(),
             in_lobby: s.in_lobby,
             lobby_message: s.lobby_message.clone(),
             rejected_reason: s.rejected_reason.clone(),
@@ -142,6 +159,7 @@ impl From<&RoomSnapshot> for NovaRoomSnapshot {
                     audio_level: p.audio_level,
                     breakout_id: p.breakout_id.clone(),
                     speaking_ms: p.speaking_ms,
+                    is_visitor: p.is_visitor,
                 })
                 .collect(),
             lobby: s
@@ -271,12 +289,17 @@ pub fn parse_nova_meeting_url(raw_url: String) -> Result<NovaParsedMeetingUrl, N
         .query_pairs()
         .find(|(k, _)| k == "jwt" || k == "token")
         .map(|(_, v)| v.into_owned());
+    let visitor = parsed
+        .query_pairs()
+        .find(|(k, _)| k == "visitor")
+        .is_some_and(|(_, v)| v.eq_ignore_ascii_case("true") || v == "1");
 
     Ok(NovaParsedMeetingUrl {
         ws_url,
         http_origin,
         room,
         token,
+        visitor,
     })
 }
 
@@ -310,6 +333,7 @@ impl NovaClientCore {
         token: Option<String>,
         audio_muted: bool,
         video_muted: bool,
+        visitor: bool,
     ) -> Result<String, NovaCoreError> {
         if display_name.trim().is_empty() {
             return Err(NovaCoreError::InvalidPayload {
@@ -324,6 +348,7 @@ impl NovaClientCore {
             video_muted,
             email: None,
             avatar_url: None,
+            visitor,
         })
     }
 
@@ -435,6 +460,8 @@ impl NovaClientCore {
             "mute_video" => ModerationAction::MuteVideo,
             "kick" => ModerationAction::Kick,
             "grant_moderator" => ModerationAction::GrantModerator,
+            "promote_visitor" => ModerationAction::PromoteVisitor,
+            "demote_visitor" => ModerationAction::DemoteVisitor,
             other => {
                 return Err(NovaCoreError::InvalidPayload {
                     detail: format!("unknown moderation action: {other}"),
@@ -495,6 +522,18 @@ impl NovaClientCore {
         NovaRoomSnapshot::from(&*guard)
     }
 
+    pub fn hide_dialog(&self) -> NovaRoomSnapshot {
+        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        guard.hide_dialog();
+        NovaRoomSnapshot::from(&*guard)
+    }
+
+    pub fn set_pip_mode(&self, enabled: bool) -> NovaRoomSnapshot {
+        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        guard.set_pip_mode(enabled);
+        NovaRoomSnapshot::from(&*guard)
+    }
+
     pub fn derive_e2ee_key_b64(&self, passphrase: String, generation: u32) -> Result<String, NovaCoreError> {
         let room = {
             let guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
@@ -517,9 +556,11 @@ mod tests {
         assert_eq!(ok.http_origin, "http://127.0.0.1:3000");
         assert_eq!(ok.token.as_deref(), Some("abc"));
 
-        let short = parse_nova_meeting_url("meet.nova.dev/standup_01".into()).expect("parse bare host");
+        let short = parse_nova_meeting_url("meet.nova.dev/standup_01?visitor=true".into()).expect("parse bare host");
         assert_eq!(short.room, "standup_01");
         assert_eq!(short.ws_url, "wss://meet.nova.dev/ws/standup_01");
+        assert!(short.visitor);
+        assert!(!ok.visitor);
 
         assert!(parse_nova_meeting_url("https://meet.nova.dev/room/bad room!".into()).is_err());
     }
@@ -528,7 +569,7 @@ mod tests {
     fn client_core_builds_and_applies_events() {
         let core = NovaClientCore::new("team".into());
         let join_json = core
-            .build_join_payload("Alice".into(), None, None, false, true)
+            .build_join_payload("Alice".into(), None, None, false, true, false)
             .expect("join json");
         assert!(join_json.contains("Alice"));
 
@@ -555,6 +596,7 @@ mod tests {
             shared_video: None,
             follow_me: None,
             files: vec![],
+            is_visitor: false,
         })
         .expect("serialize joined");
         let snap = core.apply_server_json(joined).expect("apply joined");
@@ -581,5 +623,58 @@ mod tests {
             )
             .expect("room security");
         assert!(sec.contains(r#""type":"room_security""#));
+
+        // Visitor JoinMeetingDialog stays hidden across PiP transitions once dismissed.
+        let visitor_core = NovaClientCore::new("townhall".into());
+        let v_join = visitor_core
+            .build_join_payload("Viewer".into(), None, None, true, true, true)
+            .expect("visitor join json");
+        assert!(v_join.contains(r#""visitor":true"#));
+
+        let v_joined = serde_json::to_string(&ServerMessage::Joined {
+            self_id: "v1".into(),
+            room: "townhall".into(),
+            is_moderator: false,
+            ice_servers: vec![],
+            participants: vec![],
+            messages: vec![],
+            polls: vec![],
+            breakouts: vec![],
+            strokes: vec![],
+            lobby: vec![],
+            security: crate::protocol::RoomSecurityState {
+                locked: false,
+                lobby_enabled: false,
+                e2ee_enabled: false,
+                has_password: false,
+                subject: "Townhall".into(),
+                start_audio_muted: false,
+                start_video_muted: false,
+            },
+            shared_video: None,
+            follow_me: None,
+            files: vec![],
+            is_visitor: true,
+        })
+        .expect("serialize visitor joined");
+        let snap1 = visitor_core.apply_server_json(v_joined).expect("apply visitor joined");
+        assert!(snap1.is_visitor);
+        assert_eq!(snap1.active_dialog, Some(NovaDialog::VisitorJoinMeeting));
+        assert!(snap1.show_visitor_join_dialog);
+
+        let snap_pip = visitor_core.set_pip_mode(true);
+        assert!(!snap_pip.show_visitor_join_dialog);
+        let snap_unpip = visitor_core.set_pip_mode(false);
+        assert!(snap_unpip.show_visitor_join_dialog);
+
+        let snap_hidden = visitor_core.hide_dialog();
+        assert_eq!(snap_hidden.active_dialog, None);
+        assert!(!snap_hidden.show_visitor_join_dialog);
+
+        let snap_after_pip = visitor_core.set_pip_mode(true);
+        assert!(!snap_after_pip.show_visitor_join_dialog);
+        let snap_after_exit = visitor_core.set_pip_mode(false);
+        assert_eq!(snap_after_exit.active_dialog, None);
+        assert!(!snap_after_exit.show_visitor_join_dialog);
     }
 }

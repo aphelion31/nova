@@ -53,6 +53,8 @@ pub struct JitsiJwtUser {
     pub email: Option<String>,
     #[serde(default)]
     pub moderator: Option<bool>,
+    #[serde(default)]
+    pub visitor: Option<bool>,
     pub avatar: Option<String>,
 }
 
@@ -70,6 +72,8 @@ pub struct JitsiJwtClaims {
     pub exp: usize,
     #[serde(default)]
     pub moderator: Option<bool>,
+    #[serde(default)]
+    pub visitor: Option<bool>,
     pub context: Option<JitsiJwtContext>,
 }
 
@@ -156,11 +160,13 @@ pub fn mint_room_jwt(
         room: room.to_string(),
         exp,
         moderator: Some(moderator),
+        visitor: None,
         context: Some(JitsiJwtContext {
             user: Some(JitsiJwtUser {
                 name: Some(display_name.to_string()),
                 email: email.map(ToString::to_string),
                 moderator: Some(moderator),
+                visitor: None,
                 avatar: None,
             }),
         }),

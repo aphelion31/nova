@@ -12,7 +12,10 @@ interface ParticipantsDrawerProps {
   onClose: () => void;
   onOpenInvite: () => void;
   onLobbyDecision: (peerId: string, admit: boolean) => void;
-  onModerate: (targetId: string, action: "mute_audio" | "mute_video" | "kick" | "grant_moderator") => void;
+  onModerate: (
+    targetId: string,
+    action: "mute_audio" | "mute_video" | "kick" | "grant_moderator" | "promote_visitor" | "demote_visitor",
+  ) => void;
   onDmPeer: (peerId: string) => void;
   onCreateBreakout: (name: string) => void;
   onMoveBreakout: (breakoutId: string | null) => void;
@@ -113,6 +116,11 @@ export function ParticipantsDrawer(props: ParticipantsDrawerProps) {
                       {p.display_name}
                       {p.id === props.selfId ? " (You)" : ""}
                     </span>
+                    {p.is_visitor ? (
+                      <span className="rounded bg-[#246FE5]/25 px-1.5 py-0.5 text-[10px] font-medium text-[#70A5FF]">
+                        Viewer
+                      </span>
+                    ) : null}
                   </p>
                   <p className="text-[11px] text-[#A3A3A3]">
                     {p.breakout_id
@@ -156,6 +164,16 @@ export function ParticipantsDrawer(props: ParticipantsDrawerProps) {
                     >
                       <VideoOff className="h-3.5 w-3.5" />
                     </button>
+                    {p.is_visitor ? (
+                      <button
+                        type="button"
+                        title="Promote viewer to participant"
+                        onClick={() => props.onModerate(p.id, "promote_visitor")}
+                        className="rounded bg-[#246FE5]/30 px-1.5 py-0.5 text-[10px] font-semibold text-white hover:bg-[#246FE5]"
+                      >
+                        Promote
+                      </button>
+                    ) : null}
                     {!p.is_moderator ? (
                       <button
                         type="button"

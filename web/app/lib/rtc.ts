@@ -29,6 +29,7 @@ export interface Participant {
   breakout_id?: string | null;
   joined_at: number;
   speaking_ms: number;
+  is_visitor?: boolean;
 }
 
 export interface LobbyEntry {
@@ -153,6 +154,9 @@ export class NovaRtcSession {
   selfId: string | null = null;
   room: string;
   isModerator = false;
+  isVisitor = false;
+  activeDialog: "visitor_join_meeting" | null = null;
+  inPipMode = false;
   inLobby = false;
   lobbyMessage: string | null = null;
   rejectedReason: string | null = null;
@@ -222,6 +226,20 @@ export class NovaRtcSession {
     this.talkWhileMutedEnabled = enabled;
   }
 
+  get showVisitorJoinDialog(): boolean {
+    return !this.inPipMode && this.activeDialog === "visitor_join_meeting";
+  }
+
+  hideDialog() {
+    this.activeDialog = null;
+    this.callbacks.onStateChange();
+  }
+
+  setPipMode(enabled: boolean) {
+    this.inPipMode = enabled;
+    this.callbacks.onStateChange();
+  }
+
   getActiveSpeakerId(): string | null {
     let best: Participant | null = null;
     for (const p of this.participants) {
@@ -241,6 +259,7 @@ export class NovaRtcSession {
     audioMuted: boolean;
     videoMuted: boolean;
     localStream: MediaStream | null;
+    visitor?: boolean;
   }) {
     this.audioMuted = opts.audioMuted;
     this.videoMuted = opts.videoMuted;
@@ -261,6 +280,7 @@ export class NovaRtcSession {
         avatar_url: opts.avatarUrl || null,
         audio_muted: opts.audioMuted,
         video_muted: opts.videoMuted,
+        visitor: Boolean(opts.visitor),
       });
     };
 
@@ -299,6 +319,8 @@ export class NovaRtcSession {
       case "joined": {
         this.selfId = msg.self_id as string;
         this.isModerator = Boolean(msg.is_moderator);
+        this.isVisitor = Boolean(msg.is_visitor);
+        this.activeDialog = this.isVisitor ? "visitor_join_meeting" : null;
         this.inLobby = false;
         this.lobbyMessage = null;
         this.lastError = null;
@@ -328,6 +350,7 @@ export class NovaRtcSession {
       }
       case "lobby_waiting":
         this.inLobby = true;
+        this.activeDialog = null;
         this.lobbyMessage = (msg.message as string) || "Waiting in lobby…";
         this.callbacks.onStateChange();
         break;
@@ -348,6 +371,7 @@ export class NovaRtcSession {
       }
       case "lobby_rejected":
         this.inLobby = false;
+        this.activeDialog = null;
         this.rejectedReason = (msg.reason as string) || "Entry declined";
         this.callbacks.onStateChange();
         break;
@@ -383,7 +407,13 @@ export class NovaRtcSession {
       }
       case "participant_updated": {
         const p = msg.participant as Participant;
-        if (p.id === this.selfId) this.isModerator = p.is_moderator;
+        if (p.id === this.selfId) {
+          this.isModerator = p.is_moderator;
+          this.isVisitor = Boolean(p.is_visitor);
+          if (!this.isVisitor && this.activeDialog === "visitor_join_meeting") {
+            this.activeDialog = null;
+          }
+        }
         const idx = this.participants.findIndex((x) => x.id === p.id);
         if (idx >= 0) {
           const next = this.participants.slice();
@@ -478,6 +508,7 @@ export class NovaRtcSession {
       }
       case "conference_ended": {
         const byName = (msg.by_name as string) || "Host";
+        this.activeDialog = null;
         this.close();
         this.callbacks.onConferenceEnded?.(byName);
         this.callbacks.onConferenceLeft();
@@ -488,6 +519,10 @@ export class NovaRtcSession {
         const byName = msg.by_name as string;
         if (action === "mute_audio") this.setAudioMuted(true);
         if (action === "mute_video") this.setVideoMuted(true);
+        if (action === "demote_visitor") {
+          this.setAudioMuted(true);
+          this.setVideoMuted(true);
+        }
         if (action === "kick") {
           this.close();
           this.callbacks.onConferenceLeft();

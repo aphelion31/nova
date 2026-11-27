@@ -285,7 +285,7 @@ RustBuffer uniffi_nova_core_fn_method_novaclientcore_build_end_conference_payloa
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_FN_METHOD_NOVACLIENTCORE_BUILD_JOIN_PAYLOAD
 #define UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_FN_METHOD_NOVACLIENTCORE_BUILD_JOIN_PAYLOAD
-RustBuffer uniffi_nova_core_fn_method_novaclientcore_build_join_payload(uint64_t ptr, RustBuffer display_name, RustBuffer password, RustBuffer token, int8_t audio_muted, int8_t video_muted, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_nova_core_fn_method_novaclientcore_build_join_payload(uint64_t ptr, RustBuffer display_name, RustBuffer password, RustBuffer token, int8_t audio_muted, int8_t video_muted, int8_t visitor, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_FN_METHOD_NOVACLIENTCORE_BUILD_LOBBY_DECISION_PAYLOAD
@@ -358,9 +358,19 @@ RustBuffer uniffi_nova_core_fn_method_novaclientcore_build_subtitle_payload(uint
 RustBuffer uniffi_nova_core_fn_method_novaclientcore_derive_e2ee_key_b64(uint64_t ptr, RustBuffer passphrase, uint32_t generation, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_FN_METHOD_NOVACLIENTCORE_HIDE_DIALOG
+#define UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_FN_METHOD_NOVACLIENTCORE_HIDE_DIALOG
+RustBuffer uniffi_nova_core_fn_method_novaclientcore_hide_dialog(uint64_t ptr, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_FN_METHOD_NOVACLIENTCORE_PARSE_MEETING_URL
 #define UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_FN_METHOD_NOVACLIENTCORE_PARSE_MEETING_URL
 RustBuffer uniffi_nova_core_fn_method_novaclientcore_parse_meeting_url(uint64_t ptr, RustBuffer raw_url, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_FN_METHOD_NOVACLIENTCORE_SET_PIP_MODE
+#define UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_FN_METHOD_NOVACLIENTCORE_SET_PIP_MODE
+RustBuffer uniffi_nova_core_fn_method_novaclientcore_set_pip_mode(uint64_t ptr, int8_t enabled, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_FN_METHOD_NOVACLIENTCORE_SNAPSHOT
@@ -770,9 +780,21 @@ uint16_t uniffi_nova_core_checksum_method_novaclientcore_derive_e2ee_key_b64(voi
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_CHECKSUM_METHOD_NOVACLIENTCORE_HIDE_DIALOG
+#define UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_CHECKSUM_METHOD_NOVACLIENTCORE_HIDE_DIALOG
+uint16_t uniffi_nova_core_checksum_method_novaclientcore_hide_dialog(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_CHECKSUM_METHOD_NOVACLIENTCORE_PARSE_MEETING_URL
 #define UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_CHECKSUM_METHOD_NOVACLIENTCORE_PARSE_MEETING_URL
 uint16_t uniffi_nova_core_checksum_method_novaclientcore_parse_meeting_url(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_CHECKSUM_METHOD_NOVACLIENTCORE_SET_PIP_MODE
+#define UNIFFI_FFIDEF_UNIFFI_NOVA_CORE_CHECKSUM_METHOD_NOVACLIENTCORE_SET_PIP_MODE
+uint16_t uniffi_nova_core_checksum_method_novaclientcore_set_pip_mode(void
     
 );
 #endif

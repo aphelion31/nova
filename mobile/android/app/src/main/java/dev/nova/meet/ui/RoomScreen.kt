@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -58,16 +59,21 @@ fun RoomScreen(controller: NovaClientController) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(snapshot.security.subject, style = MaterialTheme.typography.titleMedium)
-                    Text("$timerText • ${snapshot.participants.size} peers", style = MaterialTheme.typography.bodySmall)
-                }
-                OutlinedButton(onClick = { controller.toggleCarMode() }) {
-                    Text(if (carMode) "Video UI" else "Car Mode")
+            if (!snapshot.inPipMode) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            if (snapshot.isVisitor) "${snapshot.security.subject} (Viewer)" else snapshot.security.subject,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text("$timerText • ${snapshot.participants.size} peers", style = MaterialTheme.typography.bodySmall)
+                    }
+                    OutlinedButton(onClick = { controller.toggleCarMode() }) {
+                        Text(if (carMode) "Video UI" else "Car Mode")
+                    }
                 }
             }
 
@@ -122,24 +128,49 @@ fun RoomScreen(controller: NovaClientController) {
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(onClick = { controller.toggleAudio() }) {
-                    Text(if (audioMuted) "Unmute" else "Mute")
+            if (!snapshot.inPipMode) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (snapshot.isVisitor) {
+                        OutlinedButton(onClick = { controller.toggleHand() }) {
+                            Text("Raise Hand")
+                        }
+                    } else {
+                        OutlinedButton(onClick = { controller.toggleAudio() }) {
+                            Text(if (audioMuted) "Unmute" else "Mute")
+                        }
+                        OutlinedButton(onClick = { controller.toggleVideo() }) {
+                            Text(if (videoMuted) "Cam On" else "Cam Off")
+                        }
+                    }
+                    OutlinedButton(onClick = { activeSheet = "chat" }) { Text("Chat") }
+                    OutlinedButton(onClick = { activeSheet = "peers" }) { Text("Peers") }
+                    OutlinedButton(onClick = { activeSheet = "more" }) { Text("More") }
+                    Button(onClick = { controller.leave() }) { Text("Leave") }
                 }
-                OutlinedButton(onClick = { controller.toggleVideo() }) {
-                    Text(if (videoMuted) "Cam On" else "Cam Off")
-                }
-                OutlinedButton(onClick = { activeSheet = "chat" }) { Text("Chat") }
-                OutlinedButton(onClick = { activeSheet = "peers" }) { Text("Peers") }
-                OutlinedButton(onClick = { activeSheet = "more" }) { Text("More") }
-                Button(onClick = { controller.leave() }) { Text("Leave") }
             }
         }
 
-        when (activeSheet) {
-            "chat" -> ChatPollsSheet(controller = controller, onDismiss = { activeSheet = null })
-            "peers" -> ParticipantsSheet(controller = controller, onDismiss = { activeSheet = null })
-            "more" -> OverflowSheet(controller = controller, onDismiss = { activeSheet = null })
+        if (snapshot.showVisitorJoinDialog) {
+            AlertDialog(
+                onDismissRequest = { controller.hideDialog() },
+                title = { Text("Joining meeting") },
+                text = {
+                    Text("You're currently a viewer in this conference.\n\nIf you wish to speak, please raise your hand below and wait for the moderator's approval.")
+                },
+                confirmButton = {
+                    Button(onClick = { controller.hideDialog() }) {
+                        Text("OK")
+                    }
+                }
+            )
+        }
+
+        if (!snapshot.inPipMode) {
+            when (activeSheet) {
+                "chat" -> ChatPollsSheet(controller = controller, onDismiss = { activeSheet = null })
+                "peers" -> ParticipantsSheet(controller = controller, onDismiss = { activeSheet = null })
+                "more" -> OverflowSheet(controller = controller, onDismiss = { activeSheet = null })
+            }
         }
     }
 }

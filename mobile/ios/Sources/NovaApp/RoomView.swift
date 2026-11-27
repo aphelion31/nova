@@ -16,32 +16,37 @@ struct RoomView: View {
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 10) {
-                HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(bridge.snapshot.security.subject)
-                                .font(.headline)
-                                .lineLimit(1)
-                            if bridge.snapshot.security.locked {
-                                Text("Locked").font(.caption2.bold()).padding(.horizontal, 6).padding(.vertical, 2).background(Color.orange.opacity(0.2)).clipShape(Capsule())
+                if !bridge.snapshot.inPipMode {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(bridge.snapshot.security.subject)
+                                    .font(.headline)
+                                    .lineLimit(1)
+                                if bridge.snapshot.isVisitor {
+                                    Text("Viewer").font(.caption2.bold()).padding(.horizontal, 6).padding(.vertical, 2).background(Color.blue.opacity(0.25)).clipShape(Capsule())
+                                }
+                                if bridge.snapshot.security.locked {
+                                    Text("Locked").font(.caption2.bold()).padding(.horizontal, 6).padding(.vertical, 2).background(Color.orange.opacity(0.2)).clipShape(Capsule())
+                                }
+                                if bridge.snapshot.security.e2eeEnabled {
+                                    Text("E2EE").font(.caption2.bold()).padding(.horizontal, 6).padding(.vertical, 2).background(Color.green.opacity(0.2)).clipShape(Capsule())
+                                }
                             }
-                            if bridge.snapshot.security.e2eeEnabled {
-                                Text("E2EE").font(.caption2.bold()).padding(.horizontal, 6).padding(.vertical, 2).background(Color.green.opacity(0.2)).clipShape(Capsule())
-                            }
+                            Text("\(formattedTimer) • \(bridge.snapshot.participants.count) peers")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        Text("\(formattedTimer) • \(bridge.snapshot.participants.count) peers")
+                        Spacer()
+                        Button(bridge.audioRoute.rawValue) { bridge.cycleAudioRoute() }
+                            .buttonStyle(.bordered)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Button(bridge.carMode ? "Video UI" : "Car Mode") { bridge.toggleCarMode() }
+                            .buttonStyle(.bordered)
+                            .font(.caption)
                     }
-                    Spacer()
-                    Button(bridge.audioRoute.rawValue) { bridge.cycleAudioRoute() }
-                        .buttonStyle(.bordered)
-                        .font(.caption)
-                    Button(bridge.carMode ? "Video UI" : "Car Mode") { bridge.toggleCarMode() }
-                        .buttonStyle(.bordered)
-                        .font(.caption)
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
 
                 if bridge.snapshot.inLobby {
                     Spacer()
@@ -110,16 +115,22 @@ struct RoomView: View {
                     }
                 }
 
-                HStack(spacing: 8) {
-                    Button(bridge.audioMuted ? "Unmute" : "Mute") { bridge.toggleAudio() }
-                    Button(bridge.videoMuted ? "Cam On" : "Cam Off") { bridge.toggleVideo() }
-                    Button("Chat") { showChat = true }
-                    Button("Peers (\(bridge.snapshot.participants.count))") { showParticipants = true }
-                    Button("More") { showOverflow = true }
-                    Button("Leave", role: .destructive) { bridge.leave() }
+                if !bridge.snapshot.inPipMode {
+                    HStack(spacing: 8) {
+                        if bridge.snapshot.isVisitor {
+                            Button(bridge.handRaised ? "Lower Hand" : "Raise Hand") { bridge.toggleHand() }
+                        } else {
+                            Button(bridge.audioMuted ? "Unmute" : "Mute") { bridge.toggleAudio() }
+                            Button(bridge.videoMuted ? "Cam On" : "Cam Off") { bridge.toggleVideo() }
+                        }
+                        Button("Chat") { showChat = true }
+                        Button("Peers (\(bridge.snapshot.participants.count))") { showParticipants = true }
+                        Button("More") { showOverflow = true }
+                        Button("Leave", role: .destructive) { bridge.leave() }
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(.bottom, 12)
                 }
-                .buttonStyle(.bordered)
-                .padding(.bottom, 12)
             }
 
             VStack(alignment: .trailing, spacing: 6) {
@@ -139,5 +150,16 @@ struct RoomView: View {
         .sheet(isPresented: $showChat) { ChatSheet(bridge: bridge) }
         .sheet(isPresented: $showParticipants) { ParticipantsSheet(bridge: bridge) }
         .sheet(isPresented: $showOverflow) { OverflowSheet(bridge: bridge) }
+        .alert(
+            "Joining meeting",
+            isPresented: Binding(
+                get: { bridge.snapshot.showVisitorJoinDialog },
+                set: { if !$0 { bridge.hideDialog() } }
+            )
+        ) {
+            Button("OK") { bridge.hideDialog() }
+        } message: {
+            Text("You're currently a viewer in this conference.\n\nIf you wish to speak, please raise your hand below and wait for the moderator's approval.")
+        }
     }
 }
